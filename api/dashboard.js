@@ -8,8 +8,21 @@ const COLORS = [
   '#f97316', '#a855f7', '#0d9488', '#64748b', '#f43f5e',
 ]
 
+const credentials = {
+  type: "service_account",
+  project_id: "united-concord-490106-b6",
+  private_key_id: "0b76c3f5ee3d74e426ff959f64176663a21666cb",
+  private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC8jepihLaccx4v\nAs19oHyXHa0A7lZNJZqOpKQ/paqLclAWXIzS98EL7qrgBDcqXewkt9ZaYfHxXOjl\nyZuMP70FOFV7vJVgtESykh68pLpv2VP5FOMrNbqKY4IA2MB070oZE+u/Pxh1OkVw\nPPCb/nBDA2/r2Xa0LDxmDD5zKUXpJX4Leq3Y8OWvxpeOJFGlH5Oo2L1p0igOQ3ye\nirfOAafkhajUm9S+IdBT/voXO5ntHz0BWOLcEq1vcAkRYQzwsy3l7qfc9QvTVgYk\na7M7lG0/ss2MDONmSi8AcNwcI0aQBP58K9Yl3sS+6+6pK3imEfCicoa0zmRrlb9k\nBMJMubELAgMBAAECggEAFQXRqzhWz+y54c3zMV2SZprlbiQktSdLKzpKIdqLwE53\nhXa+MMt016q9nIp7yBp+uL1ShfNDsYCFaxFmaWW14n4ccdZd5VFUE4DdMnU/YDcf\n+LaOeYPdD472sLd6Bc+kOFWTRFh5lqBvm4r/3LSquZ4JfYdah84i0dHtqJNiexMF\nC08gJKqc4Q+knDTcbb1T0WQ66WlDPcocjOSs2sUB4Knz74MWCfdV91dJE5DBZ9sk\nW0XjMY6/ua3wPwfWN0aYBq/I4K1iKrYYtpen4Mfnd5r/b/UNFOuMwqdm5FbPZYLi\n8p5tdpF75e0MHUTbt10r21iNzzWiYzlngUVEW1OQQQKBgQDj3hc9KC6a7q46qyun\nZZa6Q65JDfIlmvVkUwcfTFzYIep3mNQAyq+1snxB853R3zohbrtevgSdumpfGrcP\nPg6mhsmfmilDIjPnXBUHxFP8DD0Uac9xebXzLxbGqwZdHhFDWbInxgPbRzybbc2f\n5Lkq5UgbiH7jbOhEmdqTMUvm4QKBgQDT1U4EnXaY9q4mBviArP38go71gpUd/GtW\nTnvuklNDPylF2lAPMXHBjGkqCvUo1ZMeXGhjB2OtPnnOpWpJ9wCf/coP2OlS5ro6\nFe2McdQ18Gv7YuW3XUOhKqZw0mpQMPPR7Lf4Zz/UyFZMzzb+VwUQ+cv1iMCKY57Y\nNEIpM1NRawKBgGr6aY6cvsSeKc4Bbo04dHseK0TA914QUgS3tjBLeYs+4QUlCuMU\nRUnYcd3EseNGGdR4WB8ytpgWXLopoKfXSqmDvkTf619JP3TvFjB/S66ZUFO1GV78\n9R8mjFrZEDPHWfN0uN9TZ5wa5alS86aNiyFIY4IJowjCqIkMckGIc0oBAoGAfYto\nnrGYDVX9pknxU4mzScky4uyOZeQo1VDUgHM2Z59yXZTiZ+685aHK3gD6hUX22EKa\nFz7U42Mom8FLeiSquSeXbsb2mYxnCG/ghqEbzQ/9X1KgpIjgwQ7e7/S0z2wDxQGP\nkufWW8yT4RfaFukJ9qKlL5Lp0dry1F48a+CgW5sCgYEAsgqOS7py91l13Ng071vj\n9IFh3n10WeRWsUT0lYd75LvpaO6ycAN679NptSIJ+XPRVLr5qs/Xk8GXPhWgEPIk\ndM0omm7fgmgqWhupstqQc7PtJJtGJ/chLaNwZ/cVMPXy11ybZSFMEOmeizSZhcyF\nhHAnpF/OjU52Kp6KnDnF7DM=\n-----END PRIVATE KEY-----\n",
+  client_email: "kartik@united-concord-490106-b6.iam.gserviceaccount.com",
+  client_id: "104910673039122858987",
+  auth_uri: "https://accounts.google.com/o/oauth2/auth",
+  token_uri: "https://oauth2.googleapis.com/token",
+  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+  client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/kartik%40united-concord-490106-b6.iam.gserviceaccount.com",
+  universe_domain: "googleapis.com"
+}
+
 function getAuth() {
-  const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS)
   return new google.auth.GoogleAuth({
     credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
