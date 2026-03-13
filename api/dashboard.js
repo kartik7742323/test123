@@ -1,6 +1,6 @@
 import { google } from 'googleapis'
 
-const SPREADSHEET_ID = process.env.SPREADSHEET_ID
+const SPREADSHEET_ID = '1Z6SqqjMyyd46c_qleh8rDMaPW5GIwrP53Sv-3EcLwiE'
 const COLORS = [
   '#2563eb', '#7c3aed', '#16a34a', '#dc2626', '#db2777',
   '#0891b2', '#d97706', '#6366f1', '#10b981', '#f59e0b',
@@ -9,12 +9,9 @@ const COLORS = [
 ]
 
 function getAuth() {
+  const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS)
   return new google.auth.GoogleAuth({
-    credentials: {
-      type: 'service_account',
-      client_email: process.env.GOOGLE_CLIENT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    },
+    credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   })
 }
