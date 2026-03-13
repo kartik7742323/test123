@@ -1,0 +1,165 @@
+import { google } from 'googleapis'
+
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID
+const COLORS = [
+  '#2563eb', '#7c3aed', '#16a34a', '#dc2626', '#db2777',
+  '#0891b2', '#d97706', '#6366f1', '#10b981', '#f59e0b',
+  '#3b82f6', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16',
+  '#f97316', '#a855f7', '#0d9488', '#64748b', '#f43f5e',
+]
+
+function getAuth() {
+  return new google.auth.GoogleAuth({
+    credentials: {
+      type: 'service_account',
+      client_email: process.env.GOOGLE_CLIENT_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    },
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  })
+}
+
+async function fetchSheet(sheetName) {
+  const auth = getAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: sheetName,
+  })
+  return res.data.values || []
+}
+
+function parseNum(v) {
+  if (v === undefined || v === null || v === '') return 0
+  return parseFloat(String(v).replace(/,/g, '').replace('%', '')) || 0
+}
+
+function parseSheetDate(s) {
+  if (!s) return null
+  const m = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (m) return new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]))
+  return null
+}
+
+function formatDisplayDate(d) {
+  if (!d || isNaN(d.getTime())) return null
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${d.getDate()} ${months[d.getMonth()]}'${String(d.getFullYear()).slice(2)}`
+}
+
+function formatDuration(minutes) {
+  if (minutes === undefined || minutes === null || minutes === '') return '-'
+  const totalSec = Math.round(parseFloat(minutes) * 60)
+  if (isNaN(totalSec)) return '-'
+  const m = Math.floor(totalSec / 60)
+  const s = totalSec % 60
+  return `${m}m ${String(s).padStart(2, '0')}s`
+}
+
+async function buildDashboardData() {
+  const [allClientsRows, daywiseRows, dailyRows] = await Promise.all([
+    fetchSheet('All Clients Data'),
+    fetchSheet('Daywise Calls'),
+    fetchSheet('Calls vs connected%'),
+  ])
+
+  const clientRows = allClientsRows
+    .slice(1)
+    .filter(r => r[0] && String(r[0]).trim() && !String(r[0]).toLowerCase().includes('grand'))
+
+  const clients = clientRows.map((r, i) => ({
+    id:             i + 1,
+    name:           String(r[0] || '').trim(),
+    liveDate:       String(r[2] || '').trim(),
+    useCase:        String(r[3] || 'Lead Qualification Agent').trim(),
+    totalCalls:     parseNum(r[4]),
+    connected:      parseNum(r[5]),
+    connRate:       parseNum(r[6]),
+    avgDurationMin: parseFloat(r[7]) || 0,
+    avgDuration:    formatDuration(r[7]),
+    qualified:      parseNum(r[8]),
+    qualRate:       parseNum(r[9]),
+    color:          COLORS[i % COLORS.length],
+  }))
+
+  const totalCallsDialed = clients.reduce((s, c) => s + c.totalCalls, 0)
+  const totalConnected   = clients.reduce((s, c) => s + c.connected,  0)
+  const leadsQualified   = clients.reduce((s, c) => s + c.qualified,  0)
+  const overallConnRate  = totalCallsDialed > 0
+    ? Math.round(totalConnected / totalCallsDialed * 1000) / 10 : 0
+  const avgQualRate      = clients.length > 0
+    ? Math.round(clients.reduce((s, c) => s + c.qualRate, 0) / clients.length * 10) / 10 : 0
+  const avgCallDuration  = clients.length > 0
+    ? formatDuration(clients.reduce((s, c) => s + c.avgDurationMin, 0) / clients.length)
+    : '-'
+
+  const now = new Date()
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const h = now.getHours(), mm = now.getMinutes()
+  const lastRefresh = `${h % 12 || 12}:${String(mm).padStart(2,'0')} ${h >= 12 ? 'pm' : 'am'} on ${MON[now.getMonth()]} ${now.getDate()}`
+
+  const kpi = { totalCallsDialed, totalConnected, overallConnRate, leadsQualified, avgQualRate, avgCallDuration, lastRefresh }
+
+  const dailyVolume = dailyRows
+    .slice(1)
+    .map(r => {
+      const date = parseSheetDate(r[0])
+      if (!date) return null
+      return {
+        date:           formatDisplayDate(date),
+        totalCalls:     parseNum(r[1]),
+        connectedCalls: parseNum(r[2]),
+        connRate:       parseNum(r[3]),
+        _ts:            date.getTime(),
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a._ts - b._ts)
+    .map(({ _ts, ...rest }) => rest)
+
+  const topClientsByVolume = [...clients]
+    .sort((a, b) => b.totalCalls - a.totalCalls)
+    .slice(0, 10)
+    .map(c => ({ name: c.name, calls: c.totalCalls, connected: c.connected, connRate: c.connRate }))
+
+  const scatterData = clients.map(c => ({
+    client: c.name, connRate: c.connRate, qualRate: c.qualRate, color: c.color,
+  }))
+
+  const daywiseClientNames = new Set()
+  const daywiseMap = {}
+  daywiseRows.slice(1).forEach(r => {
+    const client = String(r[1] || '').trim()
+    if (!r[0] || !client || client.toLowerCase().includes('grand')) return
+    const date = parseSheetDate(r[0])
+    if (!date) return
+    const dk = formatDisplayDate(date)
+    daywiseClientNames.add(client)
+    if (!daywiseMap[dk]) daywiseMap[dk] = { date: dk, _ts: date.getTime() }
+    daywiseMap[dk][client] = (daywiseMap[dk][client] || 0) + parseNum(r[2])
+  })
+
+  const daywiseData = Object.values(daywiseMap)
+    .sort((a, b) => a._ts - b._ts)
+    .map(({ _ts, ...rest }) => rest)
+
+  const clientColorMap = {}
+  Array.from(daywiseClientNames).forEach((name, i) => {
+    clientColorMap[name] = COLORS[i % COLORS.length]
+  })
+
+  const clientTable = clients.map(({ color, ...c }) => c)
+
+  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, clientColorMap, clientTable }
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  try {
+    const data = await buildDashboardData()
+    res.json({ success: true, data })
+  } catch (err) {
+    console.error('Error:', err.message)
+    res.status(500).json({ success: false, error: err.message })
+  }
+}
