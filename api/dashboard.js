@@ -150,9 +150,10 @@ async function buildDashboardData() {
     if (!daywiseMap[dk]) daywiseMap[dk] = { date: dk, _ts: date.getTime() }
     daywiseMap[dk][client] = (daywiseMap[dk][client] || 0) + parseNum(r[2])
     if (!daywiseByClientMap[dk]) daywiseByClientMap[dk] = {}
-    if (!daywiseByClientMap[dk][client]) daywiseByClientMap[dk][client] = { calls: 0, connected: 0 }
-    daywiseByClientMap[dk][client].calls     += parseNum(r[2])
-    daywiseByClientMap[dk][client].connected += parseNum(r[3])
+    if (!daywiseByClientMap[dk][client]) daywiseByClientMap[dk][client] = { calls: 0, connected: 0, durationSum: 0 }
+    daywiseByClientMap[dk][client].calls       += parseNum(r[2])
+    daywiseByClientMap[dk][client].connected   += parseNum(r[3])
+    daywiseByClientMap[dk][client].durationSum += (parseFloat(r[5]) || 0) * parseNum(r[2])
   })
 
   const daywiseData = Object.values(daywiseMap)

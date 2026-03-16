@@ -70,9 +70,10 @@ export default function App() {
         const ts = parseDashDate(date)
         if (ts >= fromTs && ts <= toTs) {
           Object.entries(clients).forEach(([name, s]) => {
-            if (!dateStats[name]) dateStats[name] = { calls: 0, connected: 0 }
-            dateStats[name].calls     += s.calls
-            dateStats[name].connected += s.connected
+            if (!dateStats[name]) dateStats[name] = { calls: 0, connected: 0, durationSum: 0 }
+            dateStats[name].calls        += s.calls
+            dateStats[name].connected    += s.connected
+            dateStats[name].durationSum  += (s.durationSum || 0)
           })
         }
       })
@@ -80,8 +81,10 @@ export default function App() {
         .filter(c => dateStats[c.name])
         .map(c => {
           const ds = dateStats[c.name]
-          const connRate = ds.calls > 0 ? Math.round(ds.connected / ds.calls * 1000) / 10 : 0
-          return { ...c, totalCalls: ds.calls, connected: ds.connected, connRate }
+          const connRate       = ds.calls > 0 ? Math.round(ds.connected / ds.calls * 1000) / 10 : 0
+          const avgDurationMin = ds.calls > 0 ? ds.durationSum / ds.calls : c.avgDurationMin
+          const avgDuration    = formatDuration(avgDurationMin)
+          return { ...c, totalCalls: ds.calls, connected: ds.connected, connRate, avgDurationMin, avgDuration }
         })
     }
 
