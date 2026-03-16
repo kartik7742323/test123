@@ -140,7 +140,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <div className="max-w-[1400px] mx-auto px-6 py-6">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-6">
 
         <Header lastRefresh={d.kpi.lastRefresh} onRefresh={() => fetchData(true)} />
 
@@ -156,7 +156,7 @@ export default function App() {
         <KPICards data={d.kpi} />
 
         {/* Row 2: Daily Volume + Merged Clients */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <DailyVolumeChart data={d.dailyVolume} />
           <MergedClientsChart data={d.topClientsByVolume} />
         </div>

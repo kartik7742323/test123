@@ -34,7 +34,7 @@ export default function GlobalFilters({ dates, clients, filters, onChange }) {
   const hasFilters = filters.dateFrom || filters.dateTo || filters.clients.length > 0
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 mb-4 flex items-center gap-3 flex-wrap">
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-3 sm:px-4 py-3 mb-4 flex items-center gap-2 sm:gap-3 flex-wrap">
       <div className="flex items-center gap-1.5 text-gray-500">
         <Filter size={14} />
         <span className="text-xs font-medium">Filters</span>
