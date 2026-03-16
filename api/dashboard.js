@@ -8,6 +8,18 @@ const COLORS = [
   '#f97316', '#a855f7', '#0d9488', '#64748b', '#f43f5e',
 ]
 
+function normalizeDaywiseName(name, clients) {
+  if (!name) return name
+  const n = name.toLowerCase().trim()
+  const exact = clients.find(c => c.name.toLowerCase() === n)
+  if (exact) return exact.name
+  const sub = clients.find(c => {
+    const fn = c.name.toLowerCase()
+    return fn.includes(n) || n.includes(fn)
+  })
+  return sub ? sub.name : name
+}
+
 function getAuth() {
   const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS)
   return new google.auth.GoogleAuth({
@@ -125,15 +137,22 @@ async function buildDashboardData() {
 
   const daywiseClientNames = new Set()
   const daywiseMap = {}
+  const daywiseByClientMap = {}
+
   daywiseRows.slice(1).forEach(r => {
-    const client = String(r[1] || '').trim()
-    if (!r[0] || !client || client.toLowerCase().includes('grand')) return
+    const rawClient = String(r[1] || '').trim()
+    if (!r[0] || !rawClient || rawClient.toLowerCase().includes('grand')) return
     const date = parseSheetDate(r[0])
     if (!date) return
+    const client = normalizeDaywiseName(rawClient, clients)
     const dk = formatDisplayDate(date)
     daywiseClientNames.add(client)
     if (!daywiseMap[dk]) daywiseMap[dk] = { date: dk, _ts: date.getTime() }
     daywiseMap[dk][client] = (daywiseMap[dk][client] || 0) + parseNum(r[2])
+    if (!daywiseByClientMap[dk]) daywiseByClientMap[dk] = {}
+    if (!daywiseByClientMap[dk][client]) daywiseByClientMap[dk][client] = { calls: 0, connected: 0 }
+    daywiseByClientMap[dk][client].calls     += parseNum(r[2])
+    daywiseByClientMap[dk][client].connected += parseNum(r[3])
   })
 
   const daywiseData = Object.values(daywiseMap)
@@ -147,7 +166,7 @@ async function buildDashboardData() {
 
   const clientTable = clients.map(({ color, ...c }) => c)
 
-  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, clientColorMap, clientTable }
+  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, daywiseByClient: daywiseByClientMap, clientColorMap, clientTable }
 }
 
 export default async function handler(req, res) {

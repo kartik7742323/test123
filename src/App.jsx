@@ -57,62 +57,91 @@ export default function App() {
 
     const fromTs = filters.dateFrom ? parseDashDate(filters.dateFrom) : 0
     const toTs   = filters.dateTo   ? parseDashDate(filters.dateTo)   : Infinity
-    const activeClients = new Set(filters.clients)
+    const activeClients   = new Set(filters.clients)
     const hasDateFilter   = !!(filters.dateFrom || filters.dateTo)
     const hasClientFilter = activeClients.size > 0
+    const dbc             = data.daywiseByClient || {}
 
-    // ── Daily volume (date filter) ──────────────────────────────────────────
-    const dailyVolume = hasDateFilter
-      ? data.dailyVolume.filter(d => {
-          const ts = parseDashDate(d.date)
-          return ts >= fromTs && ts <= toTs
+    // ── Step 1: Date-filter clientTable using daywiseByClient ──────────────
+    let baseClientTable = data.clientTable
+    if (hasDateFilter) {
+      const dateStats = {}
+      Object.entries(dbc).forEach(([date, clients]) => {
+        const ts = parseDashDate(date)
+        if (ts >= fromTs && ts <= toTs) {
+          Object.entries(clients).forEach(([name, s]) => {
+            if (!dateStats[name]) dateStats[name] = { calls: 0, connected: 0 }
+            dateStats[name].calls     += s.calls
+            dateStats[name].connected += s.connected
+          })
+        }
+      })
+      baseClientTable = data.clientTable
+        .filter(c => dateStats[c.name])
+        .map(c => {
+          const ds = dateStats[c.name]
+          const connRate = ds.calls > 0 ? Math.round(ds.connected / ds.calls * 1000) / 10 : 0
+          return { ...c, totalCalls: ds.calls, connected: ds.connected, connRate }
         })
-      : data.dailyVolume
+    }
 
-    // ── Daywise data (date + client filter) ────────────────────────────────
-    let daywiseData = hasDateFilter
-      ? data.daywiseData.filter(d => {
-          const ts = parseDashDate(d.date)
-          return ts >= fromTs && ts <= toTs
+    // ── Step 2: Apply client filter on top ─────────────────────────────────
+    const clientTable = hasClientFilter
+      ? baseClientTable.filter(c => activeClients.has(c.name))
+      : baseClientTable
+
+    // ── Step 3: Daily Volume (date + client filtered) ───────────────────────
+    let dailyVolume
+    if (hasClientFilter) {
+      const dayMap = {}
+      Object.entries(dbc).forEach(([date, clients]) => {
+        const ts = parseDashDate(date)
+        if (hasDateFilter && (ts < fromTs || ts > toTs)) return
+        let totalCalls = 0, connected = 0
+        activeClients.forEach(c => {
+          if (clients[c]) { totalCalls += clients[c].calls; connected += clients[c].connected }
         })
+        if (totalCalls > 0)
+          dayMap[date] = { date, totalCalls, connectedCalls: connected, connRate: Math.round(connected / totalCalls * 1000) / 10, _ts: ts }
+      })
+      dailyVolume = Object.values(dayMap).sort((a, b) => a._ts - b._ts).map(({ _ts, ...rest }) => rest)
+    } else if (hasDateFilter) {
+      dailyVolume = data.dailyVolume.filter(d => { const ts = parseDashDate(d.date); return ts >= fromTs && ts <= toTs })
+    } else {
+      dailyVolume = data.dailyVolume
+    }
+
+    // ── Step 4: Daywise chart (date filter only — chart has its own client filter) ──
+    const daywiseData = hasDateFilter
+      ? data.daywiseData.filter(d => { const ts = parseDashDate(d.date); return ts >= fromTs && ts <= toTs })
       : data.daywiseData
 
-    // ── Client-filtered data ────────────────────────────────────────────────
-    const clientTable = hasClientFilter
-      ? data.clientTable.filter(c => activeClients.has(c.name))
-      : data.clientTable
+    // ── Step 5: Top 10 + Scatter from filtered clientTable ──────────────────
+    const topClientsByVolume = clientTable
+      .slice().sort((a, b) => b.totalCalls - a.totalCalls).slice(0, 10)
+      .map(c => ({ name: c.name, calls: c.totalCalls, connected: c.connected, connRate: c.connRate }))
 
-    const scatterData = hasClientFilter
-      ? data.scatterData.filter(c => activeClients.has(c.client))
-      : data.scatterData
-
-    // Top 10 from filtered clients
-    const topClientsByVolume = (hasClientFilter
-      ? clientTable.slice().sort((a, b) => b.totalCalls - a.totalCalls).slice(0, 10)
-      : data.topClientsByVolume
-    ).map(c => ({
-      name:      c.name,
-      calls:     c.totalCalls ?? c.calls,
-      connected: c.connected,
-      connRate:  c.connRate,
+    const colorMap = {}
+    data.scatterData.forEach(d => { colorMap[d.client] = d.color })
+    const scatterData = clientTable.map(c => ({
+      client: c.name, connRate: c.connRate, qualRate: c.qualRate,
+      color: colorMap[c.name] ?? data.clientColorMap[c.name] ?? '#94a3b8',
     }))
 
-    // Recalculate KPIs from filtered clients
+    // ── Step 6: KPIs from filtered clientTable ──────────────────────────────
     const fc = clientTable
     const totalCallsDialed = fc.reduce((s, c) => s + c.totalCalls, 0)
     const totalConnected   = fc.reduce((s, c) => s + c.connected,  0)
     const leadsQualified   = fc.reduce((s, c) => s + c.qualified,  0)
     const overallConnRate  = totalCallsDialed > 0 ? Math.round(totalConnected / totalCallsDialed * 1000) / 10 : 0
     const avgQualRate      = fc.length > 0 ? Math.round(fc.reduce((s, c) => s + c.qualRate, 0) / fc.length * 10) / 10 : 0
-    // Simple average of per-client avg durations — same formula as table last row
     const avgCallDuration  = fc.length > 0
       ? formatDuration(fc.reduce((s, c) => s + (c.avgDurationMin ?? 0), 0) / fc.length)
       : data.kpi.avgCallDuration
 
     const kpi = { ...data.kpi, totalCallsDialed, totalConnected, overallConnRate, leadsQualified, avgQualRate, avgCallDuration }
 
-    return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, clientTable,
-             clientColorMap: data.clientColorMap }
+    return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, clientTable, clientColorMap: data.clientColorMap }
   }, [data, filters])
 
   // ── Loading ───────────────────────────────────────────────────────────────
