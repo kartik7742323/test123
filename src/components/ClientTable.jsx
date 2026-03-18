@@ -405,8 +405,8 @@ export default function ClientTable({ data }) {
                         onClick={e => { e.stopPropagation(); setFilterOpen(isOpen ? null : col.key) }}
                         className={`p-0.5 rounded transition-colors ml-0.5 ${
                           isFilter
-                            ? 'text-blue-600 bg-blue-50'
-                            : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100 opacity-0 group-hover:opacity-100'
+                            ? 'text-blue-600 bg-blue-100'
+                            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
                         }`}
                       >
                         <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
