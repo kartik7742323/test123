@@ -1,28 +1,71 @@
+require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
+const crypto = require('crypto')
 const { google } = require('googleapis')
 
 const app = express()
 const PORT = 3001
 
 app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'] }))
+app.use(express.json())
+
+// ─── Auth & Encryption config ────────────────────────────────────────────────
+const AUTH_SECRET = 'MioAuth!Secret#2024@Meritto'
+const ENC_KEY     = Buffer.from('MioAdoption$Analytics#Key2024!XZ') // 32 bytes → AES-256
+const USERNAME    = 'product@meritto.com'
+const PASSWORD    = '1!2MIC#@!S5G3F>>__!@'
+
+function createToken() {
+  const ts  = Date.now().toString(16)
+  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(ts).digest('hex')
+  return `${ts}.${sig}`
+}
+
+function verifyToken(token) {
+  if (!token) return false
+  const parts = token.split('.')
+  if (parts.length !== 2) return false
+  const [ts, sig] = parts
+  try {
+    const expected = crypto.createHmac('sha256', AUTH_SECRET).update(ts).digest('hex')
+    const sigBuf   = Buffer.from(sig, 'hex')
+    const expBuf   = Buffer.from(expected, 'hex')
+    if (sigBuf.length !== expBuf.length) return false
+    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return false
+    const age = Date.now() - parseInt(ts, 16)
+    return age >= 0 && age < 24 * 60 * 60 * 1000
+  } catch { return false }
+}
+
+function encrypt(obj) {
+  const iv     = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENC_KEY, iv)
+  const enc    = Buffer.concat([cipher.update(JSON.stringify(obj), 'utf8'), cipher.final()])
+  const tag    = cipher.getAuthTag()
+  return { iv: iv.toString('hex'), tag: tag.toString('hex'), data: enc.toString('hex') }
+}
+
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization || ''
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : ''
+  if (!verifyToken(token)) return res.status(401).json({ success: false, error: 'Unauthorized' })
+  next()
+}
+
+// ─── Login endpoint ───────────────────────────────────────────────────────────
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body || {}
+  if (username !== USERNAME || password !== PASSWORD) {
+    return res.status(401).json({ success: false, error: 'Invalid credentials' })
+  }
+  res.json({ success: true, token: createToken() })
+})
 
 // ─── Google Sheets config ────────────────────────────────────────────────────
 const SPREADSHEET_ID = '1Z6SqqjMyyd46c_qleh8rDMaPW5GIwrP53Sv-3EcLwiE'
 
-const credentials = {
-  "type": "service_account",
-  "project_id": "united-concord-490106-b6",
-  "private_key_id": "0b76c3f5ee3d74e426ff959f64176663a21666cb",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC8jepihLaccx4v\nAs19oHyXHa0A7lZNJZqOpKQ/paqLclAWXIzS98EL7qrgBDcqXewkt9ZaYfHxXOjl\nyZuMP70FOFV7vJVgtESykh68pLpv2VP5FOMrNbqKY4IA2MB070oZE+u/Pxh1OkVw\nPPCb/nBDA2/r2Xa0LDxmDD5zKUXpJX4Leq3Y8OWvxpeOJFGlH5Oo2L1p0igOQ3ye\nirfOAafkhajUm9S+IdBT/voXO5ntHz0BWOLcEq1vcAkRYQzwsy3l7qfc9QvTVgYk\na7M7lG0/ss2MDONmSi8AcNwcI0aQBP58K9Yl3sS+6+6pK3imEfCicoa0zmRrlb9k\nBMJMubELAgMBAAECggEAFQXRqzhWz+y54c3zMV2SZprlbiQktSdLKzpKIdqLwE53\nhXa+MMt016q9nIp7yBp+uL1ShfNDsYCFaxFmaWW14n4ccdZd5VFUE4DdMnU/YDcf\n+LaOeYPdD472sLd6Bc+kOFWTRFh5lqBvm4r/3LSquZ4JfYdah84i0dHtqJNiexMF\nC08gJKqc4Q+knDTcbb1T0WQ66WlDPcocjOSs2sUB4Knz74MWCfdV91dJE5DBZ9sk\nW0XjMY6/ua3wPwfWN0aYBq/I4K1iKrYYtpen4Mfnd5r/b/UNFOuMwqdm5FbPZYLi\n8p5tdpF75e0MHUTbt10r21iNzzWiYzlngUVEW1OQQQKBgQDj3hc9KC6a7q46qyun\nZZa6Q65JDfIlmvVkUwcfTFzYIep3mNQAyq+1snxB853R3zohbrtevgSdumpfGrcP\nPg6mhsmfmilDIjPnXBUHxFP8DD0Uac9xebXzLxbGqwZdHhFDWbInxgPbRzybbc2f\n5Lkq5UgbiH7jbOhEmdqTMUvm4QKBgQDT1U4EnXaY9q4mBviArP38go71gpUd/GtW\nTnvuklNDPylF2lAPMXHBjGkqCvUo1ZMeXGhjB2OtPnnOpWpJ9wCf/coP2OlS5ro6\nFe2McdQ18Gv7YuW3XUOhKqZw0mpQMPPR7Lf4Zz/UyFZMzzb+VwUQ+cv1iMCKY57Y\nNEIpM1NRawKBgGr6aY6cvsSeKc4Bbo04dHseK0TA914QUgS3tjBLeYs+4QUlCuMU\nRUnYcd3EseNGGdR4WB8ytpgWXLopoKfXSqmDvkTf619JP3TvFjB/S66ZUFO1GV78\n9R8mjFrZEDPHWfN0uN9TZ5wa5alS86aNiyFIY4IJowjCqIkMckGIc0oBAoGAfYto\nnrGYDVX9pknxU4mzScky4uyOZeQo1VDUgHM2Z59yXZTiZ+685aHK3gD6hUX22EKa\nFz7U42Mom8FLeiSquSeXbsb2mYxnCG/ghqEbzQ/9X1KgpIjgwQ7e7/S0z2wDxQGP\nkufWW8yT4RfaFukJ9qKlL5Lp0dry1F48a+CgW5sCgYEAsgqOS7py91l13Ng071vj\n9IFh3n10WeRWsUT0lYd75LvpaO6ycAN679NptSIJ+XPRVLr5qs/Xk8GXPhWgEPIk\ndM0omm7fgmgqWhupstqQc7PtJJtGJ/chLaNwZ/cVMPXy11ybZSFMEOmeizSZhcyF\nhHAnpF/OjU52Kp6KnDnF7DM=\n-----END PRIVATE KEY-----\n",
-  "client_email": "kartik@united-concord-490106-b6.iam.gserviceaccount.com",
-  "client_id": "104910673039122858987",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/kartik%40united-concord-490106-b6.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-}
+const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS)
 
 const COLORS = [
   '#2563eb', '#7c3aed', '#16a34a', '#dc2626', '#db2777',
@@ -30,6 +73,19 @@ const COLORS = [
   '#3b82f6', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16',
   '#f97316', '#a855f7', '#0d9488', '#64748b', '#f43f5e',
 ]
+
+// Match daywise short names (e.g. "ITM") to full client names (e.g. "ITM Business School")
+function normalizeDaywiseName(name, clients) {
+  if (!name) return name
+  const n = name.toLowerCase().trim()
+  const exact = clients.find(c => c.name.toLowerCase() === n)
+  if (exact) return exact.name
+  const sub = clients.find(c => {
+    const fn = c.name.toLowerCase()
+    return fn.includes(n) || n.includes(fn)
+  })
+  return sub ? sub.name : name
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function getAuth() {
@@ -180,16 +236,23 @@ async function buildDashboardData() {
   // Cols: Date | Client | Total Calls Dialed | Calls Connected | Connected % | Avg. Call Duration
   const daywiseClientNames = new Set()
   const daywiseMap = {}
+  const daywiseByClientMap = {}
 
   daywiseRows.slice(1).forEach(r => {
-    const client = String(r[1] || '').trim()
-    if (!r[0] || !client || client.toLowerCase().includes('grand')) return
+    const rawClient = String(r[1] || '').trim()
+    if (!r[0] || !rawClient || rawClient.toLowerCase().includes('grand')) return
     const date = parseSheetDate(r[0])
     if (!date) return
+    const client = normalizeDaywiseName(rawClient, clients)
     const dk = formatDisplayDate(date)
     daywiseClientNames.add(client)
     if (!daywiseMap[dk]) daywiseMap[dk] = { date: dk, _ts: date.getTime() }
     daywiseMap[dk][client] = (daywiseMap[dk][client] || 0) + parseNum(r[2])
+    if (!daywiseByClientMap[dk]) daywiseByClientMap[dk] = {}
+    if (!daywiseByClientMap[dk][client]) daywiseByClientMap[dk][client] = { calls: 0, connected: 0, durationSum: 0 }
+    daywiseByClientMap[dk][client].calls       += parseNum(r[2])
+    daywiseByClientMap[dk][client].connected   += parseNum(r[3])
+    daywiseByClientMap[dk][client].durationSum += (parseFloat(r[5]) || 0) * parseNum(r[2])
   })
 
   const daywiseData = Object.values(daywiseMap)
@@ -201,6 +264,8 @@ async function buildDashboardData() {
     clientColorMap[name] = COLORS[i % COLORS.length]
   })
 
+  const daywiseByClient = daywiseByClientMap
+
   // ── Client Performance Table ──────────────────────────────────────────────
   const clientTable = clients.map(({ color, ...c }) => c)
 
@@ -210,6 +275,7 @@ async function buildDashboardData() {
     topClientsByVolume,
     scatterData,
     daywiseData,
+    daywiseByClient,
     clientColorMap,
     clientTable,
   }
@@ -220,7 +286,7 @@ let cache = null
 let cacheTime = 0
 const CACHE_TTL = 5 * 60 * 1000
 
-app.get('/api/dashboard', async (req, res) => {
+app.get('/api/dashboard', requireAuth, async (req, res) => {
   try {
     const now = Date.now()
     if (!cache || req.query.refresh === '1' || (now - cacheTime) > CACHE_TTL) {
@@ -229,7 +295,7 @@ app.get('/api/dashboard', async (req, res) => {
       cacheTime = now
       console.log('Data fetched and cached.')
     }
-    res.json({ success: true, data: cache })
+    res.json({ success: true, data: encrypt(cache) })
   } catch (err) {
     console.error('Error:', err.message)
     res.status(500).json({ success: false, error: err.message })

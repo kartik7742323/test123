@@ -1,4 +1,32 @@
 import { google } from 'googleapis'
+import crypto from 'crypto'
+
+const AUTH_SECRET = 'MioAuth!Secret#2024@Meritto'
+const ENC_KEY     = Buffer.from('MioAdoption$Analytics#Key2024!XZ') // 32 bytes → AES-256
+
+function verifyToken(token) {
+  if (!token) return false
+  const parts = token.split('.')
+  if (parts.length !== 2) return false
+  const [ts, sig] = parts
+  try {
+    const expected = crypto.createHmac('sha256', AUTH_SECRET).update(ts).digest('hex')
+    const sigBuf   = Buffer.from(sig, 'hex')
+    const expBuf   = Buffer.from(expected, 'hex')
+    if (sigBuf.length !== expBuf.length) return false
+    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return false
+    const age = Date.now() - parseInt(ts, 16)
+    return age >= 0 && age < 24 * 60 * 60 * 1000
+  } catch { return false }
+}
+
+function encrypt(obj) {
+  const iv     = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENC_KEY, iv)
+  const enc    = Buffer.concat([cipher.update(JSON.stringify(obj), 'utf8'), cipher.final()])
+  const tag    = cipher.getAuthTag()
+  return { iv: iv.toString('hex'), tag: tag.toString('hex'), data: enc.toString('hex') }
+}
 
 const SPREADSHEET_ID = '1Z6SqqjMyyd46c_qleh8rDMaPW5GIwrP53Sv-3EcLwiE'
 const COLORS = [
@@ -172,9 +200,17 @@ async function buildDashboardData() {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization')
+
+  const header = req.headers.authorization || ''
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : ''
+  if (!verifyToken(token)) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' })
+  }
+
   try {
     const data = await buildDashboardData()
-    res.json({ success: true, data })
+    res.json({ success: true, data: encrypt(data) })
   } catch (err) {
     console.error('Error:', err.message)
     res.status(500).json({ success: false, error: err.message })

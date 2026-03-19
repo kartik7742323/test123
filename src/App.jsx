@@ -7,6 +7,8 @@ import LeadQualScatter from './components/LeadQualScatter'
 import DaywiseChart from './components/DaywiseChart'
 import ClientTable from './components/ClientTable'
 import GlobalFilters from './components/GlobalFilters'
+import LoginPage from './LoginPage'
+import { decryptResponse } from './crypto'
 
 // Parse "25 Feb'26" → timestamp for comparison
 function parseDashDate(s) {
@@ -26,6 +28,7 @@ function formatDuration(minutes) {
 }
 
 export default function App() {
+  const [token, setToken]     = useState(() => sessionStorage.getItem('mio_auth_token') || '')
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
@@ -34,10 +37,19 @@ export default function App() {
   const fetchData = async (forceRefresh = false) => {
     try {
       setLoading(true); setError(null)
-      const res  = await fetch(forceRefresh ? '/api/dashboard?refresh=1' : '/api/dashboard')
+      const url = forceRefresh ? '/api/dashboard?refresh=1' : '/api/dashboard'
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (res.status === 401) {
+        sessionStorage.removeItem('mio_auth_token')
+        setToken('')
+        return
+      }
       const json = await res.json()
       if (!json.success) throw new Error(json.error)
-      setData(json.data)
+      const decrypted = await decryptResponse(json.data)
+      setData(decrypted)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -45,7 +57,9 @@ export default function App() {
     }
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { if (token) fetchData() }, [token])
+
+  if (!token) return <LoginPage onLogin={t => setToken(t)} />
 
   // ── Derived filter options ────────────────────────────────────────────────
   const dateOptions   = useMemo(() => data?.dailyVolume?.map(d => d.date) ?? [], [data])
