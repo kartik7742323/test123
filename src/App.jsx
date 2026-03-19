@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Header from './components/Header'
 import KPICards from './components/KPICards'
 import DailyVolumeChart from './components/DailyVolumeChart'
@@ -34,7 +34,13 @@ export default function App() {
   const [error, setError]     = useState(null)
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', clients: [] })
 
-  const fetchData = async (forceRefresh = false, authToken = token) => {
+  // Ref always holds the latest token — avoids stale closure in fetchData
+  const tokenRef = useRef(token)
+  tokenRef.current = token
+
+  const fetchData = useCallback(async (forceRefresh = false) => {
+    const authToken = tokenRef.current
+    if (!authToken) return
     try {
       setLoading(true); setError(null)
       const url = forceRefresh ? '/api/dashboard?refresh=1' : '/api/dashboard'
@@ -55,12 +61,14 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  // On mount: fetch only if token already exists (e.g. page refresh)
-  useEffect(() => { if (token) fetchData() }, [])
+  // Runs on mount (page refresh) AND whenever token changes (after login)
+  useEffect(() => {
+    if (token) fetchData()
+  }, [token])
 
-  if (!token) return <LoginPage onLogin={t => { setToken(t); fetchData(false, t) }} />
+  if (!token) return <LoginPage onLogin={t => setToken(t)} />
 
   // ── Derived filter options ────────────────────────────────────────────────
   const dateOptions   = useMemo(() => data?.dailyVolume?.map(d => d.date) ?? [], [data])
