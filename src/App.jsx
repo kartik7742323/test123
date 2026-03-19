@@ -34,12 +34,12 @@ export default function App() {
   const [error, setError]     = useState(null)
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', clients: [] })
 
-  const fetchData = async (forceRefresh = false) => {
+  const fetchData = async (forceRefresh = false, authToken = token) => {
     try {
       setLoading(true); setError(null)
       const url = forceRefresh ? '/api/dashboard?refresh=1' : '/api/dashboard'
       const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { 'Authorization': `Bearer ${authToken}` },
       })
       if (res.status === 401) {
         sessionStorage.removeItem('mio_auth_token')
@@ -57,9 +57,10 @@ export default function App() {
     }
   }
 
-  useEffect(() => { if (token) fetchData() }, [token])
+  // On mount: fetch only if token already exists (e.g. page refresh)
+  useEffect(() => { if (token) fetchData() }, [])
 
-  if (!token) return <LoginPage onLogin={t => setToken(t)} />
+  if (!token) return <LoginPage onLogin={t => { setToken(t); fetchData(false, t) }} />
 
   // ── Derived filter options ────────────────────────────────────────────────
   const dateOptions   = useMemo(() => data?.dailyVolume?.map(d => d.date) ?? [], [data])
