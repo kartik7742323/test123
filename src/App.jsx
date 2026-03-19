@@ -162,16 +162,6 @@ export default function App() {
     return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, clientTable, clientColorMap: data.clientColorMap }
   }, [data, filters])
 
-  // ── Loading ───────────────────────────────────────────────────────────────
-  if (loading) return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-500 text-sm">Loading data from Google Sheets…</p>
-      </div>
-    </div>
-  )
-
   // ── Error ─────────────────────────────────────────────────────────────────
   if (error) return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center">
@@ -184,6 +174,16 @@ export default function App() {
   )
 
   const d = filtered
+
+  // ── Loading — show spinner whenever data isn't ready yet ──────────────────
+  if (loading || !d) return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-gray-500 text-sm">Loading data from Google Sheets…</p>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-slate-100">
