@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage() {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading]   = useState(false)
@@ -20,7 +20,7 @@ export default function LoginPage({ onLogin }) {
       const json = await res.json()
       if (!json.success) throw new Error(json.error || 'Invalid credentials')
       sessionStorage.setItem('mio_auth_token', json.token)
-      onLogin(json.token)
+      window.location.reload()
     } catch (err) {
       setError(err.message)
     } finally {

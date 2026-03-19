@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Header from './components/Header'
 import KPICards from './components/KPICards'
 import DailyVolumeChart from './components/DailyVolumeChart'
@@ -28,28 +28,22 @@ function formatDuration(minutes) {
 }
 
 export default function App() {
-  const [token, setToken]     = useState(() => sessionStorage.getItem('mio_auth_token') || '')
+  const token = sessionStorage.getItem('mio_auth_token') || ''
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', clients: [] })
 
-  // Ref always holds the latest token — avoids stale closure in fetchData
-  const tokenRef = useRef(token)
-  tokenRef.current = token
-
-  const fetchData = useCallback(async (forceRefresh = false) => {
-    const authToken = tokenRef.current
-    if (!authToken) return
+  const fetchData = async (forceRefresh = false) => {
     try {
       setLoading(true); setError(null)
       const url = forceRefresh ? '/api/dashboard?refresh=1' : '/api/dashboard'
       const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${authToken}` },
+        headers: { 'Authorization': `Bearer ${token}` },
       })
       if (res.status === 401) {
         sessionStorage.removeItem('mio_auth_token')
-        setToken('')
+        window.location.reload()
         return
       }
       const json = await res.json()
@@ -61,14 +55,11 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
-  // Runs on mount (page refresh) AND whenever token changes (after login)
-  useEffect(() => {
-    if (token) fetchData()
-  }, [token])
+  useEffect(() => { if (token) fetchData() }, [])
 
-  if (!token) return <LoginPage onLogin={t => setToken(t)} />
+  if (!token) return <LoginPage />
 
   // ── Derived filter options ────────────────────────────────────────────────
   const dateOptions   = useMemo(() => data?.dailyVolume?.map(d => d.date) ?? [], [data])
