@@ -7,6 +7,10 @@ import LeadQualScatter from './components/LeadQualScatter'
 import DaywiseChart from './components/DaywiseChart'
 import ClientTable from './components/ClientTable'
 import GlobalFilters from './components/GlobalFilters'
+import GuideKPICards from './components/GuideKPICards'
+import GuideDailyChart from './components/GuideDailyChart'
+import GuideClientTable from './components/GuideClientTable'
+import GuideTopInstitutesChart from './components/GuideTopInstitutesChart'
 import LoginPage from './LoginPage'
 import { decryptResponse } from './crypto'
 
@@ -32,7 +36,9 @@ export default function App() {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
-  const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', clients: [] })
+  const [filters, setFilters]           = useState({ dateFrom: '', dateTo: '', clients: [] })
+  const [guideFilters, setGuideFilters] = useState({ dateFrom: '', dateTo: '', clients: [] })
+  const [activeTab, setActiveTab]       = useState('voice')
 
   const fetchData = async (forceRefresh = false) => {
     try {
@@ -62,8 +68,10 @@ export default function App() {
   if (!token) return <LoginPage />
 
   // ── Derived filter options ────────────────────────────────────────────────
-  const dateOptions   = useMemo(() => data?.dailyVolume?.map(d => d.date) ?? [], [data])
-  const clientOptions = useMemo(() => data?.clientTable?.map(c => c.name) ?? [],  [data])
+  const dateOptions        = useMemo(() => data?.dailyVolume?.map(d => d.date) ?? [],          [data])
+  const clientOptions      = useMemo(() => data?.clientTable?.map(c => c.name) ?? [],          [data])
+  const guideDateOptions   = useMemo(() => data?.guide?.dailyData?.map(d => d.date) ?? [],     [data])
+  const guideInstOptions   = useMemo(() => data?.guide?.clientTable?.map(c => c.name) ?? [],   [data])
 
   // ── Apply filters ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -161,6 +169,77 @@ export default function App() {
     return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, clientTable, clientColorMap: data.clientColorMap }
   }, [data, filters])
 
+  // ── Guide filtered data ────────────────────────────────────────────────────
+  const filteredGuide = useMemo(() => {
+    const g = data?.guide
+    if (!g) return null
+
+    const fromTs        = guideFilters.dateFrom ? parseDashDate(guideFilters.dateFrom) : 0
+    const toTs          = guideFilters.dateTo   ? parseDashDate(guideFilters.dateTo)   : Infinity
+    const activeInsts   = new Set(guideFilters.clients)
+    const hasDateFilter = !!(guideFilters.dateFrom || guideFilters.dateTo)
+    const hasInstFilter = activeInsts.size > 0
+
+    // ── 1. Chart: filter daily data by date range ──────────────────────────
+    const dailyData = hasDateFilter
+      ? g.dailyData.filter(d => { const ts = parseDashDate(d.date); return ts >= fromTs && ts <= toTs })
+      : g.dailyData
+
+    // ── 2. Table: filter by selected institutes ────────────────────────────
+    const clientTable = hasInstFilter
+      ? g.clientTable.filter(c => activeInsts.has(c.name))
+      : g.clientTable
+
+    // ── 3. Top 10 + Scatter from filtered clientTable ─────────────────────
+    const topByConversations = [...clientTable]
+      .sort((a, b) => b.conversations - a.conversations)
+      .slice(0, 10)
+      .map(c => ({ name: c.name, conversations: c.conversations, usersInteracted: c.usersInteracted }))
+
+    const colorMap = {}
+    data.guide.scatterData.forEach(d => { colorMap[d.institute] = d.color })
+    const scatterData = clientTable.map(c => ({
+      institute:    c.name,
+      convsPerUser: c.convsPerUser,
+      avgMessages:  c.avgMessages,
+      color:        colorMap[c.name] ?? '#94a3b8',
+    }))
+
+    // ── 5. KPIs ────────────────────────────────────────────────────────────
+    let totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser
+    // dimmedKpis: keys that can't be recomputed for the active filter (shown with "all-time" tag)
+    const dimmedKpis = new Set()
+
+    if (hasInstFilter) {
+      totalConversations = clientTable.reduce((s, c) => s + c.conversations, 0)
+      totalUsers         = clientTable.reduce((s, c) => s + c.usersInteracted, 0)
+      avgMessages        = clientTable.length > 0 ? Math.round(clientTable.reduce((s, c) => s + c.avgMessages,   0) / clientTable.length * 10)  / 10  : 0
+      avgConvsPerUser    = clientTable.length > 0 ? Math.round(clientTable.reduce((s, c) => s + c.convsPerUser,  0) / clientTable.length * 100) / 100 : 0
+      activeClients      = clientTable.filter(c => c.status.toLowerCase().includes('live')).length
+    } else if (hasDateFilter) {
+      totalConversations = dailyData.reduce((s, d) => s + d.conversations, 0)
+      totalUsers         = dailyData.reduce((s, d) => s + d.usersInteracted, 0)
+      avgConvsPerUser    = totalUsers > 0 ? Math.round(totalConversations / totalUsers * 100) / 100 : 0
+      // These 2 cannot be derived from daily aggregate data — show all-time values with a tag
+      avgMessages   = g.kpi.avgMessages
+      activeClients = g.kpi.activeClients
+      dimmedKpis.add('avgMessages'); dimmedKpis.add('activeClients')
+    } else {
+      ;({ totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser } = g.kpi)
+    }
+
+    return {
+      kpi: { totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser },
+      dailyData,
+      clientTable,
+      topByConversations,
+      scatterData,
+      hasInstFilter,
+      hasDateFilter,
+      dimmedKpis,
+    }
+  }, [data, guideFilters])
+
   // ── Error ─────────────────────────────────────────────────────────────────
   if (error) return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center">
@@ -190,37 +269,86 @@ export default function App() {
 
         <Header lastRefresh={d.kpi.lastRefresh} onRefresh={() => fetchData(true)} />
 
-        {/* Global Filters */}
-        <GlobalFilters
-          dates={dateOptions}
-          clients={clientOptions}
-          filters={filters}
-          onChange={setFilters}
-        />
-
-        {/* KPI Cards */}
-        <KPICards data={d.kpi} />
-
-        {/* Row 2: Daily Volume + Merged Clients */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <DailyVolumeChart data={d.dailyVolume} />
-          <MergedClientsChart data={d.topClientsByVolume} />
+        {/* Tab Switcher */}
+        <div className="flex gap-1 p-1 bg-gray-200 rounded-xl mb-4 sm:mb-6 w-fit">
+          <button
+            onClick={() => setActiveTab('voice')}
+            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
+              activeTab === 'voice'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Mio Voice
+          </button>
+          <button
+            onClick={() => setActiveTab('guide')}
+            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
+              activeTab === 'guide'
+                ? 'bg-white text-emerald-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Mio Guide
+          </button>
         </div>
 
-        {/* Row 3: Scatter (full width) */}
-        <div className="mb-4">
-          <LeadQualScatter data={d.scatterData} />
-        </div>
+        {/* ── Mio Voice ── */}
+        {activeTab === 'voice' && (
+          <>
+            <GlobalFilters
+              dates={dateOptions}
+              clients={clientOptions}
+              filters={filters}
+              onChange={setFilters}
+            />
+            <KPICards data={d.kpi} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <DailyVolumeChart data={d.dailyVolume} />
+              <MergedClientsChart data={d.topClientsByVolume} />
+            </div>
+            <div className="mb-4">
+              <LeadQualScatter data={d.scatterData} />
+            </div>
+            <div className="mb-4">
+              <DaywiseChart data={d.daywiseData} clientColorMap={d.clientColorMap} />
+            </div>
+            <div className="mb-6">
+              <ClientTable data={d.clientTable} />
+            </div>
+          </>
+        )}
 
-        {/* Row 4: Daywise */}
-        <div className="mb-4">
-          <DaywiseChart data={d.daywiseData} clientColorMap={d.clientColorMap} />
-        </div>
+        {/* ── Mio Guide ── */}
+        {activeTab === 'guide' && filteredGuide && (
+          <>
+            <GlobalFilters
+              dates={guideDateOptions}
+              clients={guideInstOptions}
+              filters={guideFilters}
+              onChange={setGuideFilters}
+              clientLabel="All Institutes"
+            />
+            <GuideKPICards data={filteredGuide.kpi} dimmedKpis={filteredGuide.dimmedKpis} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <GuideDailyChart
+                data={filteredGuide.dailyData}
+                instFilterActive={filteredGuide.hasInstFilter}
+                selectedInsts={guideFilters.clients}
+              />
+              <GuideTopInstitutesChart data={filteredGuide.topByConversations} />
+            </div>
+            <div className="mb-6">
+              <GuideClientTable data={filteredGuide.clientTable} />
+            </div>
+          </>
+        )}
 
-        {/* Row 5: Table */}
-        <div className="mb-6">
-          <ClientTable data={d.clientTable} />
-        </div>
+        {activeTab === 'guide' && !filteredGuide && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400">
+            No Guide data available yet.
+          </div>
+        )}
 
       </div>
     </div>
