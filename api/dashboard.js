@@ -93,12 +93,88 @@ function formatDuration(minutes) {
   return `${m}m ${String(s).padStart(2, '0')}s`
 }
 
+async function buildGuideData(allClientsRows, daywiseRows) {
+  const clientRows = allClientsRows.slice(1).filter(r => r[0] && String(r[0]).trim())
+
+  const clients = clientRows.map((r, i) => {
+    const conversations   = parseNum(r[2])
+    const avgMessages     = parseNum(r[3])
+    const usersInteracted = parseNum(r[4])
+    const convsPerUser    = usersInteracted > 0 ? Math.round(conversations / usersInteracted * 100) / 100 : 0
+    return {
+      id: i + 1,
+      name:            String(r[0] || '').trim(),
+      status:          String(r[1] || '').trim(),
+      conversations,
+      avgMessages,
+      usersInteracted,
+      convsPerUser,
+      color:           COLORS[i % COLORS.length],
+    }
+  })
+
+  const totalConversations = clients.reduce((s, c) => s + c.conversations, 0)
+  const totalUsers         = clients.reduce((s, c) => s + c.usersInteracted, 0)
+  const avgMessages        = clients.length > 0
+    ? Math.round(clients.reduce((s, c) => s + c.avgMessages, 0) / clients.length * 10) / 10 : 0
+  const activeClients      = clients.filter(c => c.status.toLowerCase().includes('live')).length
+  const avgConvsPerUser    = clients.length > 0
+    ? Math.round(clients.reduce((s, c) => s + c.convsPerUser, 0) / clients.length * 100) / 100 : 0
+
+  const topByConversations = [...clients]
+    .sort((a, b) => b.conversations - a.conversations)
+    .slice(0, 10)
+    .map(c => ({ name: c.name, conversations: c.conversations, usersInteracted: c.usersInteracted }))
+
+  const scatterData = clients.map(c => ({
+    institute:    c.name,
+    convsPerUser: c.convsPerUser,
+    avgMessages:  c.avgMessages,
+    color:        c.color,
+  }))
+
+  const dailyData = daywiseRows
+    .slice(1)
+    .map(r => {
+      if (!r[4]) return null
+      const d = parseSheetDate(String(r[4]).trim())
+      if (!d) return null
+      return {
+        date:            formatDisplayDate(d),
+        conversations:   parseNum(r[2]),
+        usersInteracted: parseNum(r[3]),
+        _ts:             d.getTime(),
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a._ts - b._ts)
+    .map(({ _ts, ...rest }) => rest)
+
+  return {
+    kpi: { totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser },
+    clientTable: clients.map(({ color, ...c }) => c),
+    topByConversations,
+    scatterData,
+    dailyData,
+  }
+}
+
 async function buildDashboardData() {
   const [allClientsRows, daywiseRows, dailyRows] = await Promise.all([
     fetchSheet('All Clients Data'),
     fetchSheet('Daywise Calls'),
     fetchSheet('Calls vs connected%'),
   ])
+
+  let guideAllRows = [], guideDaywiseRows = []
+  try {
+    ;[guideAllRows, guideDaywiseRows] = await Promise.all([
+      fetchSheet('Guide - All Client Data'),
+      fetchSheet('Guide - Daywise Interactions'),
+    ])
+  } catch (e) {
+    console.warn('Guide sheets not found:', e.message)
+  }
 
   const clientRows = allClientsRows
     .slice(1)
@@ -195,7 +271,9 @@ async function buildDashboardData() {
 
   const clientTable = clients.map(({ color, ...c }) => c)
 
-  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, daywiseByClient: daywiseByClientMap, clientColorMap, clientTable }
+  const guide = await buildGuideData(guideAllRows, guideDaywiseRows)
+
+  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, daywiseByClient: daywiseByClientMap, clientColorMap, clientTable, guide }
 }
 
 export default async function handler(req, res) {
