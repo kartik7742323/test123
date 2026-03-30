@@ -159,6 +159,81 @@ async function buildGuideData(allClientsRows, daywiseRows) {
   }
 }
 
+function trackerKpi(clients, liveStatuses, churnStatuses, holdStatuses) {
+  const total      = clients.length
+  const live       = clients.filter(c => liveStatuses.includes(c.status)).length
+  const churned    = clients.filter(c => churnStatuses.includes(c.status)).length
+  const onHold     = clients.filter(c => holdStatuses.includes(c.status)).length
+  const inProgress = total - live - churned - onHold
+  return { total, live, inProgress, onHold, churned }
+}
+
+function buildTrackerData(voiceRows, guideRows) {
+  // ── Voice Tracker ─────────────────────────────────────────────────────────
+  // Cols: 0=Institute, 1=Setup Type, 2=Agent Type, 3=Onboarding Date,
+  //       8=Owner, 9=Ageing, 10=Status, 17=Live Date
+  const voiceClients = voiceRows.slice(1)
+    .filter(r => r[0] && String(r[0]).trim())
+    .map(r => ({
+      name:           String(r[0] || '').trim(),
+      setupType:      String(r[1] || '').trim(),
+      agentType:      String(r[2] || '').trim(),
+      onboardingDate: String(r[3] || '').trim(),
+      owner:          String(r[8] || '').trim(),
+      ageing:         r[9] ? parseInt(r[9]) || null : null,
+      status:         String(r[10] || '').trim(),
+      liveDate:       String(r[17] || '').trim(),
+    }))
+    .filter(c => c.status)
+
+  const voiceByStatus = Object.entries(
+    voiceClients.reduce((acc, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc }, {})
+  )
+    .map(([status, count]) => ({ status, count }))
+    .sort((a, b) => b.count - a.count)
+
+  const voiceKpi = trackerKpi(
+    voiceClients,
+    ['H. Live'],
+    ['L. Churn'],
+    ['K. On-Hold'],
+  )
+
+  // ── Guide Tracker ─────────────────────────────────────────────────────────
+  // Cols: 0=Institute, 2=Onboarding Date, 6=Ageing, 7=Status,
+  //       8=Live Date, 9=TAT, 13=Meritto SPOC
+  const guideClients = guideRows.slice(1)
+    .filter(r => r[0] && String(r[0]).trim())
+    .map(r => ({
+      name:           String(r[0] || '').trim(),
+      onboardingDate: String(r[2] || '').trim(),
+      ageing:         r[6] ? parseInt(r[6]) || null : null,
+      status:         String(r[7] || '').trim(),
+      liveDate:       String(r[8] || '').trim(),
+      tat:            r[9] ? parseInt(r[9]) || null : null,
+      owner:          String(r[13] || '').trim(),
+    }))
+    .filter(c => c.status)
+
+  const guideByStatus = Object.entries(
+    guideClients.reduce((acc, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc }, {})
+  )
+    .map(([status, count]) => ({ status, count }))
+    .sort((a, b) => b.count - a.count)
+
+  const guideKpi = trackerKpi(
+    guideClients,
+    ['G. Live'],
+    ['K. Churn'],
+    ['I. On-hold'],
+  )
+
+  return {
+    voice: { kpi: voiceKpi, byStatus: voiceByStatus, clients: voiceClients },
+    guide: { kpi: guideKpi, byStatus: guideByStatus, clients: guideClients },
+  }
+}
+
 async function buildDashboardData() {
   const [allClientsRows, daywiseRows, dailyRows] = await Promise.all([
     fetchSheet('All Clients Data'),
@@ -273,7 +348,18 @@ async function buildDashboardData() {
 
   const guide = await buildGuideData(guideAllRows, guideDaywiseRows)
 
-  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, daywiseByClient: daywiseByClientMap, clientColorMap, clientTable, guide }
+  let tracker = null
+  try {
+    const [voiceTrackerRows, guideTrackerRows] = await Promise.all([
+      fetchSheet('Voice Tracker'),
+      fetchSheet('Guide Tracker'),
+    ])
+    tracker = buildTrackerData(voiceTrackerRows, guideTrackerRows)
+  } catch (e) {
+    console.warn('Tracker sheets not found:', e.message)
+  }
+
+  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, daywiseByClient: daywiseByClientMap, clientColorMap, clientTable, guide, tracker }
 }
 
 export default async function handler(req, res) {

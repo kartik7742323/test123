@@ -11,6 +11,9 @@ import GuideKPICards from './components/GuideKPICards'
 import GuideDailyChart from './components/GuideDailyChart'
 import GuideClientTable from './components/GuideClientTable'
 import GuideTopInstitutesChart from './components/GuideTopInstitutesChart'
+import OnboardingKPICards from './components/OnboardingKPICards'
+import OnboardingStatusChart from './components/OnboardingStatusChart'
+import OnboardingClientTable from './components/OnboardingClientTable'
 import LoginPage from './LoginPage'
 import { decryptResponse } from './crypto'
 
@@ -39,6 +42,7 @@ export default function App() {
   const [filters, setFilters]           = useState({ dateFrom: '', dateTo: '', clients: [] })
   const [guideFilters, setGuideFilters] = useState({ dateFrom: '', dateTo: '', clients: [] })
   const [activeTab, setActiveTab]       = useState('voice')
+  const [onboardingSubTab, setOnboardingSubTab] = useState('voice')
 
   const fetchData = async (forceRefresh = false) => {
     try {
@@ -291,6 +295,16 @@ export default function App() {
           >
             Mio Guide
           </button>
+          <button
+            onClick={() => setActiveTab('onboarding')}
+            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
+              activeTab === 'onboarding'
+                ? 'bg-white text-violet-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Mio Onboarding
+          </button>
         </div>
 
         {/* ── Mio Voice ── */}
@@ -347,6 +361,71 @@ export default function App() {
         {activeTab === 'guide' && !filteredGuide && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400">
             No Guide data available yet.
+          </div>
+        )}
+
+        {/* ── Mio Onboarding ── */}
+        {activeTab === 'onboarding' && data?.tracker && (
+          <>
+            {/* Sub-tab switcher */}
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-4 w-fit">
+              <button
+                onClick={() => setOnboardingSubTab('voice')}
+                className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-all ${
+                  onboardingSubTab === 'voice'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Voice Tracker
+              </button>
+              <button
+                onClick={() => setOnboardingSubTab('guide')}
+                className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-all ${
+                  onboardingSubTab === 'guide'
+                    ? 'bg-white text-emerald-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Guide Tracker
+              </button>
+            </div>
+
+            {onboardingSubTab === 'voice' && (
+              <>
+                <OnboardingKPICards kpi={data.tracker.voice.kpi} />
+                <div className="mb-4">
+                  <OnboardingStatusChart
+                    data={data.tracker.voice.byStatus}
+                    title="Voice Onboarding — Status Breakdown"
+                  />
+                </div>
+                <div className="mb-6">
+                  <OnboardingClientTable clients={data.tracker.voice.clients} type="voice" />
+                </div>
+              </>
+            )}
+
+            {onboardingSubTab === 'guide' && (
+              <>
+                <OnboardingKPICards kpi={data.tracker.guide.kpi} />
+                <div className="mb-4">
+                  <OnboardingStatusChart
+                    data={data.tracker.guide.byStatus}
+                    title="Guide Onboarding — Status Breakdown"
+                  />
+                </div>
+                <div className="mb-6">
+                  <OnboardingClientTable clients={data.tracker.guide.clients} type="guide" />
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {activeTab === 'onboarding' && !data?.tracker && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400">
+            No Onboarding data available yet.
           </div>
         )}
 
