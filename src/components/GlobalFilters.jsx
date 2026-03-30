@@ -182,7 +182,7 @@ function DateRangePicker({ dates, dateFrom, dateTo, onApply, onClear }) {
 }
 
 // ─── Main GlobalFilters ───────────────────────────────────────────────────────
-export default function GlobalFilters({ dates, clients, filters, onChange }) {
+export default function GlobalFilters({ dates, clients, filters, onChange, clientLabel = 'All Clients' }) {
   const [clientOpen,   setClientOpen]   = useState(false)
   const [clientSearch, setClientSearch] = useState('')
   const dropdownRef = useRef(null)
@@ -230,7 +230,7 @@ export default function GlobalFilters({ dates, clients, filters, onChange }) {
         >
           <span>
             {filters.clients.length === 0
-              ? 'All Clients'
+              ? clientLabel
               : filters.clients.length === 1
                 ? filters.clients[0].split(' ')[0] + '…'
                 : `${filters.clients.length} clients`}
@@ -256,7 +256,7 @@ export default function GlobalFilters({ dates, clients, filters, onChange }) {
               <button
                 onClick={() => onChange({ ...filters, clients: [] })}
                 className={`w-full text-left px-3 py-1.5 text-xs rounded-lg transition-colors font-medium ${filters.clients.length === 0 ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'}`}
-              >All Clients</button>
+              >{clientLabel}</button>
             </div>
             <div className="max-h-52 overflow-y-auto p-1">
               {filteredClients.map((c) => (

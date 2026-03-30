@@ -14,6 +14,9 @@ import GuideTopInstitutesChart from './components/GuideTopInstitutesChart'
 import OnboardingKPICards from './components/OnboardingKPICards'
 import OnboardingStatusChart from './components/OnboardingStatusChart'
 import OnboardingClientTable from './components/OnboardingClientTable'
+import OnboardingLastFiveLive from './components/OnboardingLastFiveLive'
+import OnboardingMonthAvg from './components/OnboardingMonthAvg'
+import OnboardingAgeingMatrix from './components/OnboardingAgeingMatrix'
 import LoginPage from './LoginPage'
 import { decryptResponse } from './crypto'
 
@@ -393,12 +396,14 @@ export default function App() {
 
             {onboardingSubTab === 'voice' && (
               <>
-                <OnboardingKPICards kpi={data.tracker.voice.kpi} />
-                <div className="mb-4">
-                  <OnboardingStatusChart
-                    data={data.tracker.voice.byStatus}
-                    title="Voice Onboarding — Status Breakdown"
-                  />
+                <OnboardingKPICards kpi={data.tracker.voice.kpi} type="voice" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <OnboardingStatusChart data={data.tracker.voice.byStatus} title="Voice — Status Breakdown" />
+                  <OnboardingLastFiveLive data={data.tracker.voice.lastFiveLive} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <OnboardingMonthAvg data={data.tracker.voice.monthAvg} />
+                  <OnboardingAgeingMatrix data={data.tracker.voice.ageingMatrix} />
                 </div>
                 <div className="mb-6">
                   <OnboardingClientTable clients={data.tracker.voice.clients} type="voice" />
@@ -408,12 +413,14 @@ export default function App() {
 
             {onboardingSubTab === 'guide' && (
               <>
-                <OnboardingKPICards kpi={data.tracker.guide.kpi} />
-                <div className="mb-4">
-                  <OnboardingStatusChart
-                    data={data.tracker.guide.byStatus}
-                    title="Guide Onboarding — Status Breakdown"
-                  />
+                <OnboardingKPICards kpi={data.tracker.guide.kpi} type="guide" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <OnboardingStatusChart data={data.tracker.guide.byStatus} title="Guide — Status Breakdown" />
+                  <OnboardingLastFiveLive data={data.tracker.guide.lastFiveLive} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <OnboardingMonthAvg data={data.tracker.guide.monthAvg} />
+                  <OnboardingAgeingMatrix data={data.tracker.guide.ageingMatrix} />
                 </div>
                 <div className="mb-6">
                   <OnboardingClientTable clients={data.tracker.guide.clients} type="guide" />

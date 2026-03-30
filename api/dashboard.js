@@ -159,78 +159,257 @@ async function buildGuideData(allClientsRows, daywiseRows) {
   }
 }
 
-function trackerKpi(clients, liveStatuses, churnStatuses, holdStatuses) {
-  const total      = clients.length
-  const live       = clients.filter(c => liveStatuses.includes(c.status)).length
-  const churned    = clients.filter(c => churnStatuses.includes(c.status)).length
-  const onHold     = clients.filter(c => holdStatuses.includes(c.status)).length
-  const inProgress = total - live - churned - onHold
-  return { total, live, inProgress, onHold, churned }
-}
-
 function buildTrackerData(voiceRows, guideRows) {
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const monthLabel   = d => d && !isNaN(d.getTime()) ? `${MONTHS[d.getMonth()]} '${String(d.getFullYear()).slice(2)}` : null
+  const monthSortKey = d => d ? d.getFullYear() * 100 + d.getMonth() : 0
+
+  const AGEING_BUCKETS = [
+    { label: '0–4',  min: 0,  max: 4 },
+    { label: '5–9',  min: 5,  max: 9 },
+    { label: '10–14',min: 10, max: 14 },
+    { label: '15–19',min: 15, max: 19 },
+    { label: '20+',  min: 20, max: 9999 },
+  ]
+
   // ── Voice Tracker ─────────────────────────────────────────────────────────
-  // Cols: 0=Institute, 1=Setup Type, 2=Agent Type, 3=Onboarding Date,
-  //       8=Owner, 9=Ageing, 10=Status, 17=Live Date
-  const voiceClients = voiceRows.slice(1)
-    .filter(r => r[0] && String(r[0]).trim())
-    .map(r => ({
-      name:           String(r[0] || '').trim(),
-      setupType:      String(r[1] || '').trim(),
-      agentType:      String(r[2] || '').trim(),
-      onboardingDate: String(r[3] || '').trim(),
-      owner:          String(r[8] || '').trim(),
-      ageing:         r[9] ? parseInt(r[9]) || null : null,
-      status:         String(r[10] || '').trim(),
-      liveDate:       String(r[17] || '').trim(),
-    }))
-    .filter(c => c.status)
+  const VOICE_PRIORITY = {
+    'H. Live':1,'I. POC Delivered':2,'G. Client Testing':3,'F. Agent Alteration':4,
+    'E. Demo/Live call Scheduled':5,'D. Agent Creation':6,'C. RGS Pending':7,
+    'B. KOC Scheduled':8,'A. KOC Pending':9,'K. On-Hold':10,'L. Churn':11,
+  }
+  const VOICE_IP = [
+    'A. KOC Pending','B. KOC Scheduled','C. RGS Pending','D. Agent Creation',
+    'E. Demo/Live call Scheduled','F. Agent Alteration','G. Client Testing','I. POC Delivered',
+  ]
+
+  // Deduplicate: Regular only, pick best row per institute by status priority + date tiebreakers
+  const voiceMap = new Map()
+  voiceRows.slice(1)
+    .filter(r => r[0] && String(r[1]||'').trim().toLowerCase() === 'regular')
+    .forEach(r => {
+      const name   = String(r[0]).trim()
+      const status = String(r[10]||'').trim()
+      if (!status) return
+      const rank     = VOICE_PRIORITY[status] || 999
+      const onboardD = parseSheetDate(r[3]) || new Date('2100-01-01')
+      const rgsD     = parseSheetDate(r[5]) || new Date('2100-01-01')
+      const liveD    = parseSheetDate(r[17]) || new Date('2100-01-01')
+
+      if (!voiceMap.has(name)) {
+        voiceMap.set(name, { rank, onboardD, rgsD, liveD, r, status })
+      } else {
+        const ex = voiceMap.get(name)
+        let replace = false
+        if (rank < ex.rank) {
+          replace = true
+        } else if (rank === ex.rank) {
+          if (status === 'H. Live') {
+            if (liveD < ex.liveD || (liveD.getTime() === ex.liveD.getTime() && rgsD < ex.rgsD)) replace = true
+          } else {
+            if (onboardD < ex.onboardD || (onboardD.getTime() === ex.onboardD.getTime() && rgsD < ex.rgsD)) replace = true
+          }
+        }
+        if (replace) voiceMap.set(name, { rank, onboardD, rgsD, liveD, r, status })
+      }
+    })
+
+  const voiceClients = Array.from(voiceMap.values())
+    .sort((a, b) => a.onboardD - b.onboardD)
+    .map(v => {
+      const r = v.r
+      return {
+        name:              String(r[0]||'').trim(),
+        setupType:         String(r[1]||'').trim(),
+        agentType:         String(r[2]||'').trim(),
+        onboardingDate:    String(r[3]||'').trim(),
+        kocDate:           String(r[4]||'').trim(),
+        rgsDate:           String(r[5]||'').trim(),
+        owner:             String(r[8]||'').trim(),
+        ageing:            parseInt(r[9])||0,
+        status:            String(r[10]||'').trim(),
+        liveDate:          String(r[17]||'').trim(),
+        onboardToLiveDays: parseFloat(r[24])||0,
+        merrittoPoc:       String(r[28]||'').trim(),
+      }
+    })
+
+  const now = new Date()
+  const curMonth = now.getMonth(), curYear = now.getFullYear()
+
+  const voiceLive = voiceClients.filter(c => c.status === 'H. Live')
+  const voiceIP   = voiceClients.filter(c => VOICE_IP.includes(c.status))
+
+  const voiceThisMonthLive = voiceLive.filter(c => {
+    const d = parseSheetDate(c.liveDate)
+    return d && d.getMonth() === curMonth && d.getFullYear() === curYear
+  }).length
+
+  const voiceTATs = voiceLive.filter(c => c.onboardToLiveDays > 0).map(c => c.onboardToLiveDays)
+  const voiceAvgTAT     = voiceTATs.length ? Math.round(voiceTATs.reduce((s,v) => s+v,0) / voiceTATs.length) : 0
+  const voiceAvgAgeingIP = voiceIP.length ? Math.round(voiceIP.reduce((s,c) => s+c.ageing,0) / voiceIP.length) : 0
+
+  const voiceKpi = {
+    total: voiceClients.length,
+    live: voiceLive.length,
+    liveRate: voiceClients.length ? Math.round(voiceLive.length / voiceClients.length * 100) : 0,
+    inProgress: voiceIP.length,
+    onHold: voiceClients.filter(c => c.status === 'K. On-Hold').length,
+    churned: voiceClients.filter(c => c.status === 'L. Churn').length,
+    avgTAT: voiceAvgTAT,
+    thisMonthLive: voiceThisMonthLive,
+    avgAgeingIP: voiceAvgAgeingIP,
+  }
 
   const voiceByStatus = Object.entries(
-    voiceClients.reduce((acc, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc }, {})
-  )
-    .map(([status, count]) => ({ status, count }))
-    .sort((a, b) => b.count - a.count)
+    voiceClients.reduce((acc, c) => { acc[c.status] = (acc[c.status]||0)+1; return acc }, {})
+  ).map(([status, count]) => ({ status, count }))
+    .sort((a, b) => (VOICE_PRIORITY[a.status]||999) - (VOICE_PRIORITY[b.status]||999))
 
-  const voiceKpi = trackerKpi(
-    voiceClients,
-    ['H. Live'],
-    ['L. Churn'],
-    ['K. On-Hold'],
-  )
+  const voiceLastFiveLive = [...voiceLive]
+    .filter(c => c.liveDate)
+    .sort((a, b) => {
+      const da = parseSheetDate(a.liveDate), db = parseSheetDate(b.liveDate)
+      return (db ? db.getTime() : 0) - (da ? da.getTime() : 0)
+    })
+    .slice(0, 5)
+    .map(c => ({ name: c.name, liveDate: c.liveDate }))
+
+  const voiceMonthGroups = {}
+  voiceLive.forEach(c => {
+    if (!c.liveDate || c.onboardToLiveDays <= 0) return
+    const d = parseSheetDate(c.liveDate); if (!d) return
+    const key = monthLabel(d); if (!key) return
+    if (!voiceMonthGroups[key]) voiceMonthGroups[key] = { values: [], sk: monthSortKey(d) }
+    voiceMonthGroups[key].values.push(c.onboardToLiveDays)
+  })
+  const voiceMonthAvg = Object.entries(voiceMonthGroups)
+    .sort((a, b) => b[1].sk - a[1].sk)
+    .map(([month, g]) => ({
+      month,
+      avgDays: Math.round(g.values.reduce((s,v) => s+v,0) / g.values.length),
+      count: g.values.length,
+    }))
+
+  const voiceMatrixStatuses = VOICE_IP.filter(s => voiceClients.some(c => c.status === s))
+  const voiceAgeingMatrix = {
+    buckets: AGEING_BUCKETS.map(b => b.label),
+    rows: voiceMatrixStatuses.map(s => ({
+      status: s,
+      counts: AGEING_BUCKETS.map(b => voiceClients.filter(c => c.status === s && c.ageing >= b.min && c.ageing <= b.max).length),
+    })),
+    totals: AGEING_BUCKETS.map(b => voiceIP.filter(c => c.ageing >= b.min && c.ageing <= b.max).length),
+  }
 
   // ── Guide Tracker ─────────────────────────────────────────────────────────
-  // Cols: 0=Institute, 2=Onboarding Date, 6=Ageing, 7=Status,
-  //       8=Live Date, 9=TAT, 13=Meritto SPOC
-  const guideClients = guideRows.slice(1)
+  const GUIDE_PRIORITY = {
+    'G. Live':1,'F. Code Placement Pending':2,'C. Setup Pending':3,
+    'A. KOC Pending':4,'I. On-hold':5,'K. Churn':6,
+  }
+  const GUIDE_IP = ['A. KOC Pending','C. Setup Pending','F. Code Placement Pending']
+
+  const guideMap = new Map()
+  guideRows.slice(1)
     .filter(r => r[0] && String(r[0]).trim())
-    .map(r => ({
-      name:           String(r[0] || '').trim(),
-      onboardingDate: String(r[2] || '').trim(),
-      ageing:         r[6] ? parseInt(r[6]) || null : null,
-      status:         String(r[7] || '').trim(),
-      liveDate:       String(r[8] || '').trim(),
-      tat:            r[9] ? parseInt(r[9]) || null : null,
-      owner:          String(r[13] || '').trim(),
-    }))
-    .filter(c => c.status)
+    .forEach(r => {
+      const name   = String(r[0]).trim()
+      const status = String(r[7]||'').trim()
+      if (!status) return
+      const rank     = GUIDE_PRIORITY[status] || 999
+      const onboardD = parseSheetDate(r[2]) || new Date('2100-01-01')
+      const liveD    = parseSheetDate(r[8]) || new Date('2100-01-01')
+      if (!guideMap.has(name)) {
+        guideMap.set(name, { rank, onboardD, liveD, r, status })
+      } else {
+        const ex = guideMap.get(name)
+        if (rank < ex.rank || (rank === ex.rank && onboardD < ex.onboardD))
+          guideMap.set(name, { rank, onboardD, liveD, r, status })
+      }
+    })
+
+  const guideClients = Array.from(guideMap.values())
+    .sort((a, b) => a.onboardD - b.onboardD)
+    .map(v => {
+      const r = v.r
+      return {
+        name:           String(r[0]||'').trim(),
+        onboardingDate: String(r[2]||'').trim(),
+        kocDate:        String(r[3]||'').trim(),
+        ageing:         parseInt(r[6])||0,
+        status:         String(r[7]||'').trim(),
+        liveDate:       String(r[8]||'').trim(),
+        tat:            parseFloat(r[9])||0,
+        merrittoPoc:    String(r[13]||'').trim(),
+      }
+    })
+
+  const guideLive = guideClients.filter(c => c.status === 'G. Live')
+  const guideIP   = guideClients.filter(c => GUIDE_IP.includes(c.status))
+
+  const guideThisMonthLive = guideLive.filter(c => {
+    const d = parseSheetDate(c.liveDate)
+    return d && d.getMonth() === curMonth && d.getFullYear() === curYear
+  }).length
+
+  const guideTATs = guideLive.filter(c => c.tat > 0).map(c => c.tat)
+  const guideAvgTAT      = guideTATs.length ? Math.round(guideTATs.reduce((s,v) => s+v,0) / guideTATs.length) : 0
+  const guideAvgAgeingIP = guideIP.length ? Math.round(guideIP.reduce((s,c) => s+c.ageing,0) / guideIP.length) : 0
+
+  const guideKpi = {
+    total: guideClients.length,
+    live: guideLive.length,
+    liveRate: guideClients.length ? Math.round(guideLive.length / guideClients.length * 100) : 0,
+    inProgress: guideIP.length,
+    onHold: guideClients.filter(c => c.status === 'I. On-hold').length,
+    churned: guideClients.filter(c => c.status === 'K. Churn').length,
+    avgTAT: guideAvgTAT,
+    thisMonthLive: guideThisMonthLive,
+    avgAgeingIP: guideAvgAgeingIP,
+  }
 
   const guideByStatus = Object.entries(
-    guideClients.reduce((acc, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc }, {})
-  )
-    .map(([status, count]) => ({ status, count }))
-    .sort((a, b) => b.count - a.count)
+    guideClients.reduce((acc, c) => { acc[c.status] = (acc[c.status]||0)+1; return acc }, {})
+  ).map(([status, count]) => ({ status, count }))
+    .sort((a, b) => (GUIDE_PRIORITY[a.status]||999) - (GUIDE_PRIORITY[b.status]||999))
 
-  const guideKpi = trackerKpi(
-    guideClients,
-    ['G. Live'],
-    ['K. Churn'],
-    ['I. On-hold'],
-  )
+  const guideLastFiveLive = [...guideLive]
+    .filter(c => c.liveDate)
+    .sort((a, b) => {
+      const da = parseSheetDate(a.liveDate), db = parseSheetDate(b.liveDate)
+      return (db ? db.getTime() : 0) - (da ? da.getTime() : 0)
+    })
+    .slice(0, 5)
+    .map(c => ({ name: c.name, liveDate: c.liveDate }))
+
+  const guideMonthGroups = {}
+  guideLive.forEach(c => {
+    if (!c.liveDate || c.tat <= 0) return
+    const d = parseSheetDate(c.liveDate); if (!d) return
+    const key = monthLabel(d); if (!key) return
+    if (!guideMonthGroups[key]) guideMonthGroups[key] = { values: [], sk: monthSortKey(d) }
+    guideMonthGroups[key].values.push(c.tat)
+  })
+  const guideMonthAvg = Object.entries(guideMonthGroups)
+    .sort((a, b) => b[1].sk - a[1].sk)
+    .map(([month, g]) => ({
+      month,
+      avgDays: Math.round(g.values.reduce((s,v) => s+v,0) / g.values.length),
+      count: g.values.length,
+    }))
+
+  const guideMatrixStatuses = GUIDE_IP.filter(s => guideClients.some(c => c.status === s))
+  const guideAgeingMatrix = {
+    buckets: AGEING_BUCKETS.map(b => b.label),
+    rows: guideMatrixStatuses.map(s => ({
+      status: s,
+      counts: AGEING_BUCKETS.map(b => guideClients.filter(c => c.status === s && c.ageing >= b.min && c.ageing <= b.max).length),
+    })),
+    totals: AGEING_BUCKETS.map(b => guideIP.filter(c => c.ageing >= b.min && c.ageing <= b.max).length),
+  }
 
   return {
-    voice: { kpi: voiceKpi, byStatus: voiceByStatus, clients: voiceClients },
-    guide: { kpi: guideKpi, byStatus: guideByStatus, clients: guideClients },
+    voice: { kpi: voiceKpi, byStatus: voiceByStatus, clients: voiceClients, lastFiveLive: voiceLastFiveLive, monthAvg: voiceMonthAvg, ageingMatrix: voiceAgeingMatrix },
+    guide: { kpi: guideKpi, byStatus: guideByStatus, clients: guideClients, lastFiveLive: guideLastFiveLive, monthAvg: guideMonthAvg, ageingMatrix: guideAgeingMatrix },
   }
 }
 
