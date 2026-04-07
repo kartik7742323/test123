@@ -17,6 +17,11 @@ import OnboardingClientTable from './components/OnboardingClientTable'
 import OnboardingLastFiveLive from './components/OnboardingLastFiveLive'
 import OnboardingMonthAvg from './components/OnboardingMonthAvg'
 import OnboardingAgeingMatrix from './components/OnboardingAgeingMatrix'
+import OnboardingMonthlyTrend from './components/OnboardingMonthlyTrend'
+import OnboardingSpocLeaderboard from './components/OnboardingSpocLeaderboard'
+import OnboardingAtRisk from './components/OnboardingAtRisk'
+import OnboardingStageTAT from './components/OnboardingStageTAT'
+import OnboardingTatByAgentType from './components/OnboardingTatByAgentType'
 import LoginPage from './LoginPage'
 import { decryptResponse } from './crypto'
 
@@ -396,15 +401,26 @@ export default function App() {
 
             {onboardingSubTab === 'voice' && (
               <>
+                {/* KPI strip */}
                 <OnboardingKPICards kpi={data.tracker.voice.kpi} type="voice" />
+
+                {/* Charts row: trend + status */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <OnboardingStatusChart data={data.tracker.voice.byStatus} title="Voice — Status Breakdown" />
+                  <OnboardingMonthlyTrend data={data.tracker.voice.monthlyTrend} title="Monthly Inflow vs Live" />
+                  <OnboardingStatusChart data={data.tracker.voice.byStatus} title="Status Breakdown" />
+                </div>
+
+                {/* Cohort matrix */}
+                <div className="mb-4">
+                  <OnboardingAtRisk data={data.tracker.voice.cohortMatrix} />
+                </div>
+
+                {/* Last 5 live */}
+                <div className="mb-4">
                   <OnboardingLastFiveLive data={data.tracker.voice.lastFiveLive} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <OnboardingMonthAvg data={data.tracker.voice.monthAvg} />
-                  <OnboardingAgeingMatrix data={data.tracker.voice.ageingMatrix} />
-                </div>
+
+                {/* Full client table */}
                 <div className="mb-6">
                   <OnboardingClientTable clients={data.tracker.voice.clients} type="voice" />
                 </div>
@@ -413,15 +429,26 @@ export default function App() {
 
             {onboardingSubTab === 'guide' && (
               <>
+                {/* KPI strip */}
                 <OnboardingKPICards kpi={data.tracker.guide.kpi} type="guide" />
+
+                {/* Charts row: trend + status */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <OnboardingStatusChart data={data.tracker.guide.byStatus} title="Guide — Status Breakdown" />
+                  <OnboardingMonthlyTrend data={data.tracker.guide.monthlyTrend} title="Monthly Inflow vs Live" />
+                  <OnboardingStatusChart data={data.tracker.guide.byStatus} title="Status Breakdown" />
+                </div>
+
+                {/* Cohort matrix */}
+                <div className="mb-4">
+                  <OnboardingAtRisk data={data.tracker.guide.cohortMatrix} />
+                </div>
+
+                {/* Last 5 live */}
+                <div className="mb-4">
                   <OnboardingLastFiveLive data={data.tracker.guide.lastFiveLive} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <OnboardingMonthAvg data={data.tracker.guide.monthAvg} />
-                  <OnboardingAgeingMatrix data={data.tracker.guide.ageingMatrix} />
-                </div>
+
+                {/* Full client table */}
                 <div className="mb-6">
                   <OnboardingClientTable clients={data.tracker.guide.clients} type="guide" />
                 </div>

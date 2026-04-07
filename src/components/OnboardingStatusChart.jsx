@@ -24,7 +24,7 @@ const CustomTooltip = ({ active, payload }) => {
   const d = payload[0].payload
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 text-sm">
-      <p className="font-semibold text-gray-700">{d.status}</p>
+      <p className="font-semibold text-gray-700">{STATUS_META[d.status]?.label ?? d.status.replace(/^[A-Z]\.\s*/, '')}</p>
       <p className="text-gray-500">{d.count} client{d.count !== 1 ? 's' : ''}</p>
     </div>
   )
@@ -34,7 +34,7 @@ export default function OnboardingStatusChart({ data, title }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 h-full">
       <h3 className="text-sm font-semibold text-gray-700 mb-4">{title ?? 'Status Breakdown'}</h3>
-      <ResponsiveContainer width="100%" height={230}>
+      <ResponsiveContainer width="100%" height={240}>
         <BarChart data={data} layout="vertical" margin={{ left: 8, right: 32, top: 4, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
           <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} />

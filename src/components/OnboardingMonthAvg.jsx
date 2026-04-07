@@ -5,7 +5,7 @@ export default function OnboardingMonthAvg({ data }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 h-full">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Month-wise Avg Onboarding TAT</h3>
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">Avg TAT by Intake Month</h3>
       <div className="overflow-y-auto max-h-[260px]">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white">

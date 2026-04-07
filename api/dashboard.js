@@ -229,6 +229,11 @@ function buildTrackerData(voiceRows, guideRows) {
         ageing:            parseInt(r[9])||0,
         status:            String(r[10]||'').trim(),
         liveDate:          String(r[17]||'').trim(),
+        kocDays:           parseFloat(r[18])||0,
+        rgsDays:           parseFloat(r[19])||0,
+        agentCreationDays: parseFloat(r[20])||0,
+        demoDays:          parseFloat(r[21])||0,
+        toLiveDays:        parseFloat(r[22])||0,
         onboardToLiveDays: parseFloat(r[24])||0,
         merrittoPoc:       String(r[28]||'').trim(),
       }
@@ -277,8 +282,8 @@ function buildTrackerData(voiceRows, guideRows) {
 
   const voiceMonthGroups = {}
   voiceLive.forEach(c => {
-    if (!c.liveDate || c.onboardToLiveDays <= 0) return
-    const d = parseSheetDate(c.liveDate); if (!d) return
+    if (!c.onboardingDate || c.onboardToLiveDays <= 0) return
+    const d = parseSheetDate(c.onboardingDate); if (!d) return
     const key = monthLabel(d); if (!key) return
     if (!voiceMonthGroups[key]) voiceMonthGroups[key] = { values: [], sk: monthSortKey(d) }
     voiceMonthGroups[key].values.push(c.onboardToLiveDays)
@@ -300,6 +305,83 @@ function buildTrackerData(voiceRows, guideRows) {
     })),
     totals: AGEING_BUCKETS.map(b => voiceIP.filter(c => c.ageing >= b.min && c.ageing <= b.max).length),
   }
+
+  // ── SPOC Leaderboard (Voice) ───────────────────────────────────────────────
+  const voiceSpocMap = {}
+  voiceClients.forEach(c => {
+    const spoc = c.merrittoPoc || 'Unassigned'
+    if (!voiceSpocMap[spoc]) voiceSpocMap[spoc] = { spoc, total:0, live:0, inProgress:0, onHold:0, churned:0, tats:[] }
+    voiceSpocMap[spoc].total++
+    if (c.status === 'H. Live') { voiceSpocMap[spoc].live++; if (c.onboardToLiveDays > 0) voiceSpocMap[spoc].tats.push(c.onboardToLiveDays) }
+    else if (c.status === 'K. On-Hold') voiceSpocMap[spoc].onHold++
+    else if (c.status === 'L. Churn') voiceSpocMap[spoc].churned++
+    else if (VOICE_IP.includes(c.status)) voiceSpocMap[spoc].inProgress++
+  })
+  const voiceSpocLeaderboard = Object.values(voiceSpocMap)
+    .map(s => ({ spoc:s.spoc, total:s.total, live:s.live, liveRate:s.total?Math.round(s.live/s.total*100):0, inProgress:s.inProgress, onHold:s.onHold, churned:s.churned, avgTAT:s.tats.length?Math.round(s.tats.reduce((a,b)=>a+b,0)/s.tats.length):null }))
+    .sort((a,b) => b.total - a.total)
+
+  // ── At-Risk: in-progress with ageing ≥ 20 days (Voice) ────────────────────
+  const voiceAtRisk = voiceIP.filter(c => c.ageing >= 20).sort((a,b) => b.ageing - a.ageing)
+
+  // ── Cohort Matrix (Voice): intake month → live month counts ───────────────
+  const vcMap = {}
+  voiceClients.forEach(c => {
+    const d=parseSheetDate(c.onboardingDate); if (!d) return
+    const k=monthLabel(d); if (!k) return
+    if (!vcMap[k]) vcMap[k]={month:k,sk:monthSortKey(d),total:0,liveCounts:{},stillIP:0,onHold:0,churned:0}
+    vcMap[k].total++
+    if (c.status==='H. Live') { const ld=parseSheetDate(c.liveDate); if (ld) { const lk=monthLabel(ld); if (lk) vcMap[k].liveCounts[lk]=(vcMap[k].liveCounts[lk]||0)+1 } }
+    else if (c.status==='K. On-Hold') vcMap[k].onHold++
+    else if (c.status==='L. Churn') vcMap[k].churned++
+    else if (VOICE_IP.includes(c.status)) vcMap[k].stillIP++
+  })
+  const vcRows=Object.values(vcMap).sort((a,b) => a.sk-b.sk).map(({sk,...r}) => r)
+  const _vlmSet=new Set(); vcRows.forEach(r => Object.keys(r.liveCounts).forEach(m => _vlmSet.add(m)))
+  const vcLiveMonths=[..._vlmSet].sort((a,b) => { const sk=m=>{const[mo,yr]=m.split(" '");return(2000+parseInt(yr))*100+MONTHS.indexOf(mo)};return sk(a)-sk(b) })
+  const voiceCohortMatrix={liveMonths:vcLiveMonths,rows:vcRows}
+
+  // ── Stage-wise TAT (Voice, H. Live only, positive values) ─────────────────
+  function stageAvg(arr, key) {
+    const vals = arr.filter(c => c[key] > 0).map(c => c[key])
+    return vals.length ? { avg: Math.round(vals.reduce((a,b)=>a+b,0)/vals.length), count: vals.length } : { avg: null, count: 0 }
+  }
+  const voiceStageTAT = [
+    { stage: 'Onboarding → KOC',        ...stageAvg(voiceLive, 'kocDays') },
+    { stage: 'KOC → RGS Received',      ...stageAvg(voiceLive, 'rgsDays') },
+    { stage: 'RGS → Agent Creation',    ...stageAvg(voiceLive, 'agentCreationDays') },
+    { stage: 'Agent Creation → Demo',   ...stageAvg(voiceLive, 'demoDays') },
+    { stage: 'Demo → Live',             ...stageAvg(voiceLive, 'toLiveDays') },
+    { stage: 'Total (Onboarding → Live)',...stageAvg(voiceLive, 'onboardToLiveDays') },
+  ]
+
+  // ── TAT by Agent Type (Voice) ─────────────────────────────────────────────
+  const agentTypeMap = {}
+  voiceLive.forEach(c => {
+    if (!c.agentType || c.onboardToLiveDays <= 0) return
+    const t = c.agentType.trim()
+    if (!agentTypeMap[t]) agentTypeMap[t] = { count:0, tats:[] }
+    agentTypeMap[t].count++; agentTypeMap[t].tats.push(c.onboardToLiveDays)
+  })
+  const voiceTatByAgentType = Object.entries(agentTypeMap)
+    .map(([agentType, g]) => ({ agentType, count:g.count, avgTAT:Math.round(g.tats.reduce((a,b)=>a+b,0)/g.tats.length) }))
+    .sort((a,b) => b.count - a.count)
+
+  // ── Monthly Inflow vs Outflow (Voice) ─────────────────────────────────────
+  const voiceMonthlyMap = {}
+  voiceClients.forEach(c => {
+    const d = parseSheetDate(c.onboardingDate); if (!d) return
+    const key = monthLabel(d); if (!key) return
+    if (!voiceMonthlyMap[key]) voiceMonthlyMap[key] = { month:key, sk:monthSortKey(d), received:0, live:0 }
+    voiceMonthlyMap[key].received++
+  })
+  voiceLive.forEach(c => {
+    const d = parseSheetDate(c.liveDate); if (!d) return
+    const key = monthLabel(d); if (!key) return
+    if (!voiceMonthlyMap[key]) voiceMonthlyMap[key] = { month:key, sk:monthSortKey(d), received:0, live:0 }
+    voiceMonthlyMap[key].live++
+  })
+  const voiceMonthlyTrend = Object.values(voiceMonthlyMap).sort((a,b) => a.sk-b.sk).map(({sk,...r}) => r)
 
   // ── Guide Tracker ─────────────────────────────────────────────────────────
   const GUIDE_PRIORITY = {
@@ -383,8 +465,8 @@ function buildTrackerData(voiceRows, guideRows) {
 
   const guideMonthGroups = {}
   guideLive.forEach(c => {
-    if (!c.liveDate || c.tat <= 0) return
-    const d = parseSheetDate(c.liveDate); if (!d) return
+    if (!c.onboardingDate || c.tat <= 0) return
+    const d = parseSheetDate(c.onboardingDate); if (!d) return
     const key = monthLabel(d); if (!key) return
     if (!guideMonthGroups[key]) guideMonthGroups[key] = { values: [], sk: monthSortKey(d) }
     guideMonthGroups[key].values.push(c.tat)
@@ -407,9 +489,60 @@ function buildTrackerData(voiceRows, guideRows) {
     totals: AGEING_BUCKETS.map(b => guideIP.filter(c => c.ageing >= b.min && c.ageing <= b.max).length),
   }
 
+  // ── SPOC Leaderboard (Guide) ───────────────────────────────────────────────
+  const guideSpocMap = {}
+  guideClients.forEach(c => {
+    const spoc = c.merrittoPoc || 'Unassigned'
+    if (!guideSpocMap[spoc]) guideSpocMap[spoc] = { spoc, total:0, live:0, inProgress:0, onHold:0, churned:0, tats:[] }
+    guideSpocMap[spoc].total++
+    if (c.status === 'G. Live') { guideSpocMap[spoc].live++; if (c.tat > 0) guideSpocMap[spoc].tats.push(c.tat) }
+    else if (c.status === 'I. On-hold') guideSpocMap[spoc].onHold++
+    else if (c.status === 'K. Churn') guideSpocMap[spoc].churned++
+    else if (GUIDE_IP.includes(c.status)) guideSpocMap[spoc].inProgress++
+  })
+  const guideSpocLeaderboard = Object.values(guideSpocMap)
+    .map(s => ({ spoc:s.spoc, total:s.total, live:s.live, liveRate:s.total?Math.round(s.live/s.total*100):0, inProgress:s.inProgress, onHold:s.onHold, churned:s.churned, avgTAT:s.tats.length?Math.round(s.tats.reduce((a,b)=>a+b,0)/s.tats.length):null }))
+    .sort((a,b) => b.total - a.total)
+
+  // ── At-Risk: in-progress with ageing ≥ 20 days (Guide) ────────────────────
+  const guideAtRisk = guideIP.filter(c => c.ageing >= 20).sort((a,b) => b.ageing - a.ageing)
+
+  // ── Cohort Matrix (Guide): intake month → live month counts ───────────────
+  const gcMap = {}
+  guideClients.forEach(c => {
+    const d=parseSheetDate(c.onboardingDate); if (!d) return
+    const k=monthLabel(d); if (!k) return
+    if (!gcMap[k]) gcMap[k]={month:k,sk:monthSortKey(d),total:0,liveCounts:{},stillIP:0,onHold:0,churned:0}
+    gcMap[k].total++
+    if (c.status==='G. Live') { const ld=parseSheetDate(c.liveDate); if (ld) { const lk=monthLabel(ld); if (lk) gcMap[k].liveCounts[lk]=(gcMap[k].liveCounts[lk]||0)+1 } }
+    else if (c.status==='I. On-hold') gcMap[k].onHold++
+    else if (c.status==='K. Churn') gcMap[k].churned++
+    else if (GUIDE_IP.includes(c.status)) gcMap[k].stillIP++
+  })
+  const gcRows=Object.values(gcMap).sort((a,b) => a.sk-b.sk).map(({sk,...r}) => r)
+  const _glmSet=new Set(); gcRows.forEach(r => Object.keys(r.liveCounts).forEach(m => _glmSet.add(m)))
+  const gcLiveMonths=[..._glmSet].sort((a,b) => { const sk=m=>{const[mo,yr]=m.split(" '");return(2000+parseInt(yr))*100+MONTHS.indexOf(mo)};return sk(a)-sk(b) })
+  const guideCohortMatrix={liveMonths:gcLiveMonths,rows:gcRows}
+
+  // ── Monthly Inflow vs Outflow (Guide) ─────────────────────────────────────
+  const guideMonthlyMap = {}
+  guideClients.forEach(c => {
+    const d = parseSheetDate(c.onboardingDate); if (!d) return
+    const key = monthLabel(d); if (!key) return
+    if (!guideMonthlyMap[key]) guideMonthlyMap[key] = { month:key, sk:monthSortKey(d), received:0, live:0 }
+    guideMonthlyMap[key].received++
+  })
+  guideLive.forEach(c => {
+    const d = parseSheetDate(c.liveDate); if (!d) return
+    const key = monthLabel(d); if (!key) return
+    if (!guideMonthlyMap[key]) guideMonthlyMap[key] = { month:key, sk:monthSortKey(d), received:0, live:0 }
+    guideMonthlyMap[key].live++
+  })
+  const guideMonthlyTrend = Object.values(guideMonthlyMap).sort((a,b) => a.sk-b.sk).map(({sk,...r}) => r)
+
   return {
-    voice: { kpi: voiceKpi, byStatus: voiceByStatus, clients: voiceClients, lastFiveLive: voiceLastFiveLive, monthAvg: voiceMonthAvg, ageingMatrix: voiceAgeingMatrix },
-    guide: { kpi: guideKpi, byStatus: guideByStatus, clients: guideClients, lastFiveLive: guideLastFiveLive, monthAvg: guideMonthAvg, ageingMatrix: guideAgeingMatrix },
+    voice: { kpi: voiceKpi, byStatus: voiceByStatus, clients: voiceClients, lastFiveLive: voiceLastFiveLive, monthAvg: voiceMonthAvg, ageingMatrix: voiceAgeingMatrix, spocLeaderboard: voiceSpocLeaderboard, atRisk: voiceAtRisk, cohortMatrix: voiceCohortMatrix, stageTAT: voiceStageTAT, tatByAgentType: voiceTatByAgentType, monthlyTrend: voiceMonthlyTrend },
+    guide: { kpi: guideKpi, byStatus: guideByStatus, clients: guideClients, lastFiveLive: guideLastFiveLive, monthAvg: guideMonthAvg, ageingMatrix: guideAgeingMatrix, spocLeaderboard: guideSpocLeaderboard, atRisk: guideAtRisk, cohortMatrix: guideCohortMatrix, monthlyTrend: guideMonthlyTrend },
   }
 }
 
