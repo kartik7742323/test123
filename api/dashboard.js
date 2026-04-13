@@ -678,17 +678,22 @@ async function buildDashboardData() {
   })
   const customersAtRisk = clients
     .filter(c => !activeInLast7.has(c.name))
-    .map(c => ({
-      name: c.name,
-      totalCalls: c.totalCalls,
-      connRate: c.connRate,
-      lastSeen: lastCallDateMap[c.name] ? formatDisplayDate(lastCallDateMap[c.name]) : null,
-    }))
+    .map(c => {
+      const lastDate = lastCallDateMap[c.name]
+      const daysSince = lastDate ? Math.floor((now - lastDate) / (1000 * 60 * 60 * 24)) : null
+      return {
+        name: c.name,
+        totalCalls: c.totalCalls,
+        connRate: c.connRate,
+        lastSeen: lastDate ? formatDisplayDate(lastDate) : null,
+        daysSince,
+      }
+    })
     .sort((a, b) => {
-      if (!a.lastSeen && !b.lastSeen) return a.name.localeCompare(b.name)
-      if (!a.lastSeen) return -1
-      if (!b.lastSeen) return 1
-      return (lastCallDateMap[a.name] || 0) - (lastCallDateMap[b.name] || 0)
+      if (a.daysSince === null && b.daysSince === null) return a.name.localeCompare(b.name)
+      if (a.daysSince === null) return -1
+      if (b.daysSince === null) return 1
+      return b.daysSince - a.daysSince
     })
 
   const clientTable = clients.map(({ color, ...c }) => c)
