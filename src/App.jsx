@@ -22,6 +22,7 @@ import OnboardingSpocLeaderboard from './components/OnboardingSpocLeaderboard'
 import OnboardingAtRisk from './components/OnboardingAtRisk'
 import OnboardingStageTAT from './components/OnboardingStageTAT'
 import OnboardingTatByAgentType from './components/OnboardingTatByAgentType'
+import CustomersAtRisk from './components/CustomersAtRisk'
 import LoginPage from './LoginPage'
 import { decryptResponse } from './crypto'
 
@@ -334,6 +335,9 @@ export default function App() {
             </div>
             <div className="mb-4">
               <DaywiseChart data={d.daywiseData} clientColorMap={d.clientColorMap} />
+            </div>
+            <div className="mb-4">
+              <CustomersAtRisk data={data?.customersAtRisk} />
             </div>
             <div className="mb-6">
               <ClientTable data={d.clientTable} />

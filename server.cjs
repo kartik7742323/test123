@@ -596,6 +596,41 @@ async function buildDashboardData() {
 
   const daywiseByClient = daywiseByClientMap
 
+  // ── Customers at Risk: clients with zero calls in the last 7 days ─────────
+  function parseDashDate(s) {
+    if (!s) return null
+    const DMONTHS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 }
+    const m = String(s).match(/^(\d+) (\w+)'(\d+)$/)
+    if (!m) return null
+    return new Date(2000 + parseInt(m[3]), DMONTHS[m[2]], parseInt(m[1]))
+  }
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const activeInLast7 = new Set()
+  const lastCallDateMap = {}
+  Object.entries(daywiseByClientMap).forEach(([dateStr, clientData]) => {
+    const d = parseDashDate(dateStr); if (!d) return
+    Object.entries(clientData).forEach(([name, stats]) => {
+      if (stats.calls > 0) {
+        if (!lastCallDateMap[name] || d > lastCallDateMap[name]) lastCallDateMap[name] = d
+        if (d >= sevenDaysAgo) activeInLast7.add(name)
+      }
+    })
+  })
+  const customersAtRisk = clients
+    .filter(c => !activeInLast7.has(c.name))
+    .map(c => ({
+      name: c.name,
+      totalCalls: c.totalCalls,
+      connRate: c.connRate,
+      lastSeen: lastCallDateMap[c.name] ? formatDisplayDate(lastCallDateMap[c.name]) : null,
+    }))
+    .sort((a, b) => {
+      if (!a.lastSeen && !b.lastSeen) return a.name.localeCompare(b.name)
+      if (!a.lastSeen) return -1
+      if (!b.lastSeen) return 1
+      return (lastCallDateMap[a.name] || 0) - (lastCallDateMap[b.name] || 0)
+    })
+
   // ── Client Performance Table ──────────────────────────────────────────────
   const clientTable = clients.map(({ color, ...c }) => c)
 
@@ -621,6 +656,7 @@ async function buildDashboardData() {
     daywiseByClient,
     clientColorMap,
     clientTable,
+    customersAtRisk,
     guide,
     tracker,
   }
