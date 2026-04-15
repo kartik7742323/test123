@@ -54,6 +54,7 @@ function passesNumFilter(f, value, allVals) {
 const COLS = [
   { label: 'Institute',           key: 'name',            type: 'str' },
   { label: 'Status',              key: 'status',          type: 'str' },
+  { label: 'Live Date',           key: 'liveDate',        type: 'str' },
   { label: 'Conversations',       key: 'conversations',   type: 'num', unit: '' },
   { label: 'Avg Messages / Conv', key: 'avgMessages',     type: 'num', unit: '' },
   { label: 'Users Interacted',    key: 'usersInteracted', type: 'num', unit: '' },
@@ -245,7 +246,8 @@ export default function GuideClientTable({ data }) {
   // 1. Global search
   const afterSearch = data.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.status.toLowerCase().includes(search.toLowerCase())
+    r.status.toLowerCase().includes(search.toLowerCase()) ||
+    String(r.liveDate || '').toLowerCase().includes(search.toLowerCase())
   )
 
   // 2. Column filters
@@ -279,11 +281,11 @@ export default function GuideClientTable({ data }) {
     : 0
 
   const handleExport = () => {
-    const headers = ['Institute', 'Status', 'Conversations', 'Avg Messages/Conv', 'Users Interacted']
+    const headers = ['Institute', 'Status', 'Live Date', 'Conversations', 'Avg Messages/Conv', 'Users Interacted']
     const csv = [
       headers.join(','),
-      ...sorted.map(r => [`"${r.name}"`, r.status, r.conversations, r.avgMessages, r.usersInteracted].join(',')),
-      ['Total / Average', '—', totalConvs, avgMsgsAvg, totalUsers].join(','),
+      ...sorted.map(r => [`"${r.name}"`, r.status, `"${r.liveDate || ''}"`, r.conversations, r.avgMessages, r.usersInteracted].join(',')),
+      ['Total / Average', '—', '—', totalConvs, avgMsgsAvg, totalUsers].join(','),
     ].join('\n')
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
@@ -388,17 +390,19 @@ export default function GuideClientTable({ data }) {
               <tr key={r.id} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
                 <td className="py-3 px-2 font-medium text-gray-800">{r.name}</td>
                 <td className="py-3 px-2"><StatusBadge status={r.status} /></td>
+                <td className="py-3 px-2 text-gray-700 whitespace-nowrap">{r.liveDate || '—'}</td>
                 <td className="py-3 px-2 text-gray-700">{r.conversations.toLocaleString()}</td>
                 <td className="py-3 px-2 text-gray-700">{r.avgMessages}</td>
                 <td className="py-3 px-2 text-gray-700">{r.usersInteracted.toLocaleString()}</td>
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={5} className="py-8 text-center text-gray-400">No results match the current filters.</td></tr>
+              <tr><td colSpan={6} className="py-8 text-center text-gray-400">No results match the current filters.</td></tr>
             )}
             {sorted.length > 0 && (
               <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
                 <td className="py-3 px-2 text-gray-700">Total / Average</td>
+                <td className="py-3 px-2 text-gray-400">—</td>
                 <td className="py-3 px-2 text-gray-400">—</td>
                 <td className="py-3 px-2 text-gray-700">{totalConvs.toLocaleString()}</td>
                 <td className="py-3 px-2 text-gray-700">{avgMsgsAvg}</td>

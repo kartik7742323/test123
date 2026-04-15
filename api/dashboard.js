@@ -94,6 +94,9 @@ function formatDuration(minutes) {
 }
 
 async function buildGuideData(allClientsRows, daywiseRows) {
+  const headerRow = (allClientsRows[0] || []).map(h => String(h || '').trim().toLowerCase())
+  const liveDateIdx = headerRow.findIndex(h => h.includes('live') && h.includes('date'))
+
   const clientRows = allClientsRows.slice(1).filter(r => r[0] && String(r[0]).trim())
 
   const clients = clientRows.map((r, i) => {
@@ -105,6 +108,7 @@ async function buildGuideData(allClientsRows, daywiseRows) {
       id: i + 1,
       name:            String(r[0] || '').trim(),
       status:          String(r[1] || '').trim(),
+      liveDate:        liveDateIdx >= 0 ? String(r[liveDateIdx] || '').trim() : '',
       conversations,
       avgMessages,
       usersInteracted,
@@ -656,46 +660,6 @@ async function buildDashboardData() {
     clientColorMap[name] = COLORS[i % COLORS.length]
   })
 
-  // ── Customers at Risk: clients with zero calls in the last 7 days ─────────
-  function parseDashDate(s) {
-    if (!s) return null
-    const DMONTHS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 }
-    const m = String(s).match(/^(\d+) (\w+)'(\d+)$/)
-    if (!m) return null
-    return new Date(2000 + parseInt(m[3]), DMONTHS[m[2]], parseInt(m[1]))
-  }
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-  const activeInLast7 = new Set()
-  const lastCallDateMap = {}
-  Object.entries(daywiseByClientMap).forEach(([dateStr, clientData]) => {
-    const d = parseDashDate(dateStr); if (!d) return
-    Object.entries(clientData).forEach(([name, stats]) => {
-      if (stats.calls > 0) {
-        if (!lastCallDateMap[name] || d > lastCallDateMap[name]) lastCallDateMap[name] = d
-        if (d >= sevenDaysAgo) activeInLast7.add(name)
-      }
-    })
-  })
-  const customersAtRisk = clients
-    .filter(c => !activeInLast7.has(c.name))
-    .map(c => {
-      const lastDate = lastCallDateMap[c.name]
-      const daysSince = lastDate ? Math.floor((now - lastDate) / (1000 * 60 * 60 * 24)) : null
-      return {
-        name: c.name,
-        totalCalls: c.totalCalls,
-        connRate: c.connRate,
-        lastSeen: lastDate ? formatDisplayDate(lastDate) : null,
-        daysSince,
-      }
-    })
-    .sort((a, b) => {
-      if (a.daysSince === null && b.daysSince === null) return a.name.localeCompare(b.name)
-      if (a.daysSince === null) return -1
-      if (b.daysSince === null) return 1
-      return b.daysSince - a.daysSince
-    })
-
   const clientTable = clients.map(({ color, ...c }) => c)
 
   const guide = await buildGuideData(guideAllRows, guideDaywiseRows)
@@ -711,7 +675,7 @@ async function buildDashboardData() {
     console.warn('Tracker sheets not found:', e.message)
   }
 
-  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, daywiseByClient: daywiseByClientMap, clientColorMap, clientTable, customersAtRisk, guide, tracker }
+  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, daywiseByClient: daywiseByClientMap, clientColorMap, clientTable, guide, tracker }
 }
 
 export default async function handler(req, res) {
