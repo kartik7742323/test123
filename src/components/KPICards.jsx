@@ -16,12 +16,15 @@ function KPICard({ title, value, icon: Icon, valueColor = 'text-blue-600' }) {
 
 export default function KPICards({ data }) {
   const fmt = (n) => n.toLocaleString()
+  const qualPercent = data.totalCallsDialed > 0 ? Math.round(data.leadsQualified / data.totalCallsDialed * 1000) / 10 : 0
+  const qualValue = `${fmt(data.leadsQualified)} (${qualPercent}%)`
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-6">
       <KPICard title="Total Calls Dialed" value={fmt(data.totalCallsDialed)} icon={Phone}     valueColor="text-blue-600" />
       <KPICard title="Total Connected"    value={fmt(data.totalConnected)}   icon={PhoneCall} valueColor="text-purple-600" />
       <KPICard title="Overall Conn. Rate" value={`${data.overallConnRate}%`} icon={Target}    valueColor="text-green-600" />
-      <KPICard title="Leads Qualified"    value={fmt(data.leadsQualified)}   icon={Users}     valueColor="text-rose-500" />
+      <KPICard title="Leads Qualified"    value={qualValue}                  icon={Users}     valueColor="text-rose-500" />
       <KPICard title="Avg Call Duration"  value={data.avgCallDuration}       icon={Clock}     valueColor="text-amber-600" />
     </div>
   )
