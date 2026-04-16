@@ -663,6 +663,7 @@ async function buildDashboardData() {
   const clientTable = clients.map(({ color, ...c }) => c)
 
   // ── Customers at Risk: clients with no calls in last 7+ days ──────────────
+  const now = new Date()
   const lastCallByClient = {}
   daywiseRows.slice(1).forEach(r => {
     const rawClient = String(r[1] || '').trim()
