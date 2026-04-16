@@ -603,28 +603,6 @@ async function buildDashboardData() {
   // ── Client Performance Table ──────────────────────────────────────────────
   const clientTable = clients.map(({ color, ...c }) => c)
 
-  // ── Customers at Risk: clients with no calls in last 7+ days ──────────────
-  const now = new Date()
-  const lastCallByClient = {}
-  daywiseRows.slice(1).forEach(r => {
-    const rawClient = String(r[1] || '').trim()
-    if (!r[0] || !rawClient || rawClient.toLowerCase().includes('grand')) return
-    const date = parseSheetDate(r[0])
-    if (!date) return
-    const client = normalizeDaywiseName(rawClient, clients)
-    if (!lastCallByClient[client] || date > lastCallByClient[client]) {
-      lastCallByClient[client] = date
-    }
-  })
-  const customersAtRisk = clients
-    .map(c => {
-      const lastDate = lastCallByClient[c.name]
-      const daysSince = lastDate ? Math.floor((now - lastDate) / (1000 * 60 * 60 * 24)) : null
-      const lastSeen = lastDate ? formatDisplayDate(lastDate) : null
-      return { name: c.name, daysSince, lastSeen }
-    })
-    .filter(c => c.daysSince === null || c.daysSince >= 7)
-
   const guide = await buildGuideData(guideAllRows, guideDaywiseRows)
 
   let tracker = null
@@ -647,7 +625,6 @@ async function buildDashboardData() {
     daywiseByClient,
     clientColorMap,
     clientTable,
-    customersAtRisk,
     guide,
     tracker,
   }
