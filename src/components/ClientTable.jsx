@@ -9,9 +9,9 @@ function ConnRateBadge({ rate }) {
   return <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>{rate.toFixed(1)}%</span>
 }
 
-function fmtDuration(minutes) {
-  if (!minutes && minutes !== 0) return '—'
-  const s = Math.round(parseFloat(minutes) * 60)
+function fmtDuration(seconds) {
+  if (!seconds && seconds !== 0) return '—'
+  const s = Math.round(parseFloat(seconds))
   if (isNaN(s)) return '—'
   return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
 }

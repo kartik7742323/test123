@@ -84,9 +84,9 @@ function formatDisplayDate(d) {
   return `${d.getDate()} ${months[d.getMonth()]}'${String(d.getFullYear()).slice(2)}`
 }
 
-function formatDuration(minutes) {
-  if (minutes === undefined || minutes === null || minutes === '') return '-'
-  const totalSec = Math.round(parseFloat(minutes) * 60)
+function formatDuration(seconds) {
+  if (seconds === undefined || seconds === null || seconds === '') return '-'
+  const totalSec = Math.round(parseFloat(seconds))
   if (isNaN(totalSec)) return '-'
   const m = Math.floor(totalSec / 60)
   const s = totalSec % 60
@@ -579,8 +579,8 @@ async function buildDashboardData() {
     totalCalls:     parseNum(r[4]),
     connected:      parseNum(r[5]),
     connRate:       parseNum(r[6]),
-    avgDurationMin: parseFloat(r[7]) || 0,
-    avgDuration:    formatDuration(r[7]),
+    avgDurationMin: (parseFloat(r[7]) || 0) * 100,
+    avgDuration:    formatDuration((parseFloat(r[7]) || 0) * 100),
     qualified:      parseNum(r[8]),
     qualRate:       parseNum(r[9]),
     color:          COLORS[i % COLORS.length],
@@ -648,7 +648,7 @@ async function buildDashboardData() {
     if (!daywiseByClientMap[dk][client]) daywiseByClientMap[dk][client] = { calls: 0, connected: 0, durationSum: 0 }
     daywiseByClientMap[dk][client].calls       += parseNum(r[2])
     daywiseByClientMap[dk][client].connected   += parseNum(r[3])
-    daywiseByClientMap[dk][client].durationSum += (parseFloat(r[5]) || 0) * parseNum(r[2])
+    daywiseByClientMap[dk][client].durationSum += (parseFloat(r[5]) || 0) * 100 * parseNum(r[2])
   })
 
   const daywiseData = Object.values(daywiseMap)
@@ -661,6 +661,28 @@ async function buildDashboardData() {
   })
 
   const clientTable = clients.map(({ color, ...c }) => c)
+
+  // ── Customers at Risk: clients with no calls in last 7+ days ──────────────
+  const riskNow = new Date()
+  const lastCallByClient = {}
+  daywiseRows.slice(1).forEach(r => {
+    const rawClient = String(r[1] || '').trim()
+    if (!r[0] || !rawClient || rawClient.toLowerCase().includes('grand')) return
+    const date = parseSheetDate(r[0])
+    if (!date) return
+    const client = normalizeDaywiseName(rawClient, clients)
+    if (!lastCallByClient[client] || date > lastCallByClient[client]) {
+      lastCallByClient[client] = date
+    }
+  })
+  const customersAtRisk = clients
+    .map(c => {
+      const lastDate = lastCallByClient[c.name]
+      const daysSince = lastDate ? Math.floor((riskNow - lastDate) / (1000 * 60 * 60 * 24)) : null
+      const lastSeen = lastDate ? formatDisplayDate(lastDate) : null
+      return { name: c.name, daysSince, lastSeen }
+    })
+    .filter(c => c.daysSince === null || c.daysSince >= 7)
 
   const guide = await buildGuideData(guideAllRows, guideDaywiseRows)
 
@@ -675,7 +697,7 @@ async function buildDashboardData() {
     console.warn('Tracker sheets not found:', e.message)
   }
 
-  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, daywiseByClient: daywiseByClientMap, clientColorMap, clientTable, guide, tracker }
+  return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, daywiseByClient: daywiseByClientMap, clientColorMap, clientTable, customersAtRisk, guide, tracker }
 }
 
 export default async function handler(req, res) {

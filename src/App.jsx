@@ -35,9 +35,9 @@ function parseDashDate(s) {
   return new Date(2000 + parseInt(m[3]), MONTHS[m[2]], parseInt(m[1])).getTime()
 }
 
-function formatDuration(minutes) {
-  if (!minutes && minutes !== 0) return '-'
-  const totalSec = Math.round(parseFloat(minutes) * 60)
+function formatDuration(seconds) {
+  if (!seconds && seconds !== 0) return '-'
+  const totalSec = Math.round(parseFloat(seconds))
   if (isNaN(totalSec)) return '-'
   const m = Math.floor(totalSec / 60), s = totalSec % 60
   return `${m}m ${String(s).padStart(2, '0')}s`
