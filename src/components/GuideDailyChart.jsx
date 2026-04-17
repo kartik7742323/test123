@@ -91,13 +91,15 @@ export default function GuideDailyChart({ data, instFilterActive, selectedInsts 
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 h-full">
-      <div className="flex items-center justify-between mb-4">
-        <div>
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-gray-800">Daily Engagement Trends</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Hover over a point to see both values</p>
+          <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded transition-colors">
+            <Download size={15} />
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Granularity toggle */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">Hover over a point to see both values</p>
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
             {GRANULARITIES.map(g => (
               <button
@@ -113,9 +115,6 @@ export default function GuideDailyChart({ data, instFilterActive, selectedInsts 
               </button>
             ))}
           </div>
-          <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded transition-colors">
-            <Download size={15} />
-          </button>
         </div>
       </div>
       {instFilterActive && (
