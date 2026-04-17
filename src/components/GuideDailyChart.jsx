@@ -84,7 +84,7 @@ const GRANULARITIES = [
 ]
 
 export default function GuideDailyChart({ data, instFilterActive, selectedInsts = [] }) {
-  const [granularity, setGranularity] = useState('day')
+  const [granularity, setGranularity] = useState('week')
 
   const chartData = useMemo(() => aggregate(data || [], granularity), [data, granularity])
 

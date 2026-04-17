@@ -80,7 +80,7 @@ const GRANULARITIES = [
 ]
 
 export default function DailyVolumeChart({ data }) {
-  const [granularity, setGranularity] = useState('day')
+  const [granularity, setGranularity] = useState('week')
 
   const chartData = useMemo(() => aggregate(data || [], granularity), [data, granularity])
 
