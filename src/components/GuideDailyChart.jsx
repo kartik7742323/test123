@@ -78,10 +78,9 @@ function CustomTooltip({ active, payload, label }) {
 const fmtY = (v) => v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : v
 
 const GRANULARITIES = [
-  { key: 'day',     label: 'Day' },
-  { key: 'week',    label: 'Week' },
-  { key: 'month',   label: 'Month' },
-  { key: 'quarter', label: 'Quarter' },
+  { key: 'day',   label: 'Day' },
+  { key: 'week',  label: 'Week' },
+  { key: 'month', label: 'Month' },
 ]
 
 export default function GuideDailyChart({ data, instFilterActive, selectedInsts = [] }) {
