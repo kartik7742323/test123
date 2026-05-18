@@ -1,4 +1,4 @@
-import { MessageSquare, Users, BarChart2, Building2, Repeat2 } from 'lucide-react'
+import { MessageSquare, Users, BarChart2, Building2, Repeat2, ThumbsUp, ThumbsDown } from 'lucide-react'
 
 function KPICard({ title, value, icon: Icon, valueColor = 'text-blue-600', subtitle, dimmed }) {
   return (
@@ -18,8 +18,9 @@ function KPICard({ title, value, icon: Icon, valueColor = 'text-blue-600', subti
 
 export default function GuideKPICards({ data, dimmedKpis = new Set() }) {
   const fmt = (n) => Number(n).toLocaleString()
+  const fmtPct = (n) => n != null ? `${n}%` : '—'
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4 mb-4 sm:mb-6">
       <KPICard title="Total Conversations"    value={fmt(data.totalConversations)} icon={MessageSquare} valueColor="text-blue-600"    dimmed={dimmedKpis.has('totalConversations')} />
       <KPICard title="Total Users Interacted" value={fmt(data.totalUsers)}         icon={Users}         valueColor="text-purple-600"  dimmed={dimmedKpis.has('totalUsers')} />
       <KPICard title="Avg Messages / Conv"    value={data.avgMessages}             icon={BarChart2}     valueColor="text-emerald-600" dimmed={dimmedKpis.has('avgMessages')} />
@@ -31,6 +32,22 @@ export default function GuideKPICards({ data, dimmedKpis = new Set() }) {
         valueColor="text-rose-500"
         subtitle="return engagement"
         dimmed={dimmedKpis.has('avgConvsPerUser')}
+      />
+      <KPICard
+        title="Helpful %"
+        value={fmtPct(data.helpfulPct)}
+        icon={ThumbsUp}
+        valueColor="text-teal-600"
+        subtitle={data.helpfulCount != null ? `${Number(data.helpfulCount).toLocaleString()} responses` : null}
+        dimmed={dimmedKpis.has('helpfulPct')}
+      />
+      <KPICard
+        title="Not Helpful %"
+        value={fmtPct(data.notHelpfulPct)}
+        icon={ThumbsDown}
+        valueColor="text-orange-500"
+        subtitle={data.notHelpfulCount != null ? `${Number(data.notHelpfulCount).toLocaleString()} responses` : null}
+        dimmed={dimmedKpis.has('notHelpfulPct')}
       />
     </div>
   )

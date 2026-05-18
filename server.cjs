@@ -111,11 +111,13 @@ function parseNum(v) {
   return parseFloat(String(v).replace(/,/g, '').replace('%', '')) || 0
 }
 
-// Parse M/D/YYYY → Date object
+// Parse M/D/YYYY or M/D/YY → Date object
 function parseSheetDate(s) {
   if (!s) return null
-  const m = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (m) return new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]))
+  const m4 = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (m4) return new Date(parseInt(m4[3]), parseInt(m4[1]) - 1, parseInt(m4[2]))
+  const m2 = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)
+  if (m2) return new Date(2000 + parseInt(m2[3]), parseInt(m2[1]) - 1, parseInt(m2[2]))
   return null
 }
 
@@ -384,6 +386,9 @@ async function buildGuideData(allClientsRows, daywiseRows) {
   // Cols: Institute | Status | Number of Conversations | Avg Messages per Conv | Users Interacted | Live Date (+ possibly others)
   const headerRow = (allClientsRows[0] || []).map(h => String(h || '').trim().toLowerCase())
   const liveDateIdx = headerRow.findIndex(h => h.includes('live') && h.includes('date'))
+  const helpfulIdx = headerRow.findIndex(h => h.includes('helpful') && !h.includes('not'))
+  const notHelpfulIdx = headerRow.findIndex(h => h.includes('not') && h.includes('helpful'))
+  const totalMessagesIdx = headerRow.findIndex(h => h.includes('total') && h.includes('messages'))
 
   const clientRows = allClientsRows
     .slice(1)
@@ -405,6 +410,9 @@ async function buildGuideData(allClientsRows, daywiseRows) {
       usersInteracted,
       convsPerUser,
       msgsPerUser,
+      helpfulPct:      helpfulIdx >= 0 ? parseNum(r[helpfulIdx]) : 0,
+      notHelpfulPct:   notHelpfulIdx >= 0 ? parseNum(r[notHelpfulIdx]) : 0,
+      totalMessages:   totalMessagesIdx >= 0 ? parseNum(r[totalMessagesIdx]) : 0,
       color:           COLORS[i % COLORS.length],
     }
   })
@@ -419,6 +427,11 @@ async function buildGuideData(allClientsRows, daywiseRows) {
     ? Math.round(clients.reduce((s, c) => s + c.convsPerUser, 0) / clients.length * 100) / 100 : 0
   const avgMsgsPerUser     = clients.length > 0
     ? Math.round(clients.reduce((s, c) => s + c.msgsPerUser, 0) / clients.length * 10) / 10 : 0
+  const totalMsgsAll = clients.reduce((s, c) => s + (c.totalMessages || 0), 0)
+  const helpfulPct    = totalMsgsAll > 0
+    ? Math.round(clients.reduce((s, c) => s + (c.totalMessages || 0) * (c.helpfulPct || 0), 0) / totalMsgsAll * 10) / 10 : 0
+  const notHelpfulPct = totalMsgsAll > 0
+    ? Math.round(clients.reduce((s, c) => s + (c.totalMessages || 0) * (c.notHelpfulPct || 0), 0) / totalMsgsAll * 10) / 10 : 0
 
   // ── Top 10 by conversations ───────────────────────────────────────────────
   const topByConversations = [...clients]
@@ -435,33 +448,61 @@ async function buildGuideData(allClientsRows, daywiseRows) {
   }))
 
   // ── Daywise Interactions ───────────────────────────────────────────────────
-  // Actual layout: Col A = cumulative convs, Col B = cumulative users,
-  //                Col C = daily convs, Col D = daily users, Col E = date
-  const dailyData = daywiseRows
-    .slice(1)
-    .map(r => {
-      if (!r[4]) return null
-      const dateStr = String(r[4]).trim()
-      const d = parseSheetDate(dateStr)
-      if (!d) return null
-      const displayDate = formatDisplayDate(d)
-      return {
-        date:            displayDate,
-        conversations:   parseNum(r[2]),
-        usersInteracted: parseNum(r[3]),
-        _ts:             d.getTime(),
-      }
-    })
-    .filter(Boolean)
+  // Find column indices from header row (same approach as Voice Daywise Calls)
+  const gwHeader   = (daywiseRows[0] || []).map(h => String(h || '').trim().toLowerCase())
+  const gwDateIdx  = gwHeader.findIndex(h => h === 'date') >= 0
+    ? gwHeader.findIndex(h => h === 'date')
+    : gwHeader.findIndex(h => h.includes('date'))
+  const gwInstIdx  = gwHeader.findIndex(h => h.includes('institute') || h.includes('client') || h.includes('name'))
+  const gwConvIdx  = gwHeader.findIndex(h => h.includes('conversation') || (h.includes('conv') && !h.includes('user')))
+  const gwUsersIdx = gwHeader.findIndex(h => h.includes('user'))
+
+  // Fall back to positional defaults if header not found
+  const dateCol  = gwDateIdx  >= 0 ? gwDateIdx  : 0
+  const instCol  = gwInstIdx  >= 0 ? gwInstIdx  : 1
+  const convCol  = gwConvIdx  >= 0 ? gwConvIdx  : 2
+  const usersCol = gwUsersIdx >= 0 ? gwUsersIdx : 3
+
+  const lastConvByInst = {}
+  const dayMap = {}
+
+  daywiseRows.slice(1).forEach(r => {
+    const dateStr = String(r[dateCol] || '').trim()
+    if (!dateStr) return
+    const date = parseSheetDate(dateStr)
+    if (!date) return
+    const rawInst = String(r[instCol] || '').trim()
+    if (!rawInst || rawInst.toLowerCase().includes('total') || rawInst.toLowerCase().includes('grand')) return
+    const inst = normalizeDaywiseName(rawInst, clients)
+    if (!lastConvByInst[inst] || date > lastConvByInst[inst]) lastConvByInst[inst] = date
+    const dk = formatDisplayDate(date)
+    if (!dayMap[dk]) dayMap[dk] = { date: dk, conversations: 0, usersInteracted: 0, _ts: date.getTime() }
+    dayMap[dk].conversations   += parseNum(r[convCol])
+    dayMap[dk].usersInteracted += parseNum(r[usersCol])
+  })
+
+  const dailyData = Object.values(dayMap)
     .sort((a, b) => a._ts - b._ts)
     .map(({ _ts, ...rest }) => rest)
 
+  // ── Customers at Risk: institutes with no activity in 7+ days ─────────────
+  const riskNow = new Date()
+  const customersAtRisk = clients
+    .map(c => {
+      const lastDate = lastConvByInst[c.name]
+      const daysSince = lastDate ? Math.floor((riskNow - lastDate) / (1000 * 60 * 60 * 24)) : null
+      const lastSeen  = lastDate ? formatDisplayDate(lastDate) : null
+      return { name: c.name, daysSince, lastSeen }
+    })
+    .filter(c => c.daysSince === null || c.daysSince >= 7)
+
   return {
-    kpi: { totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser, avgMsgsPerUser },
+    kpi: { totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser, avgMsgsPerUser, helpfulPct, notHelpfulPct },
     clientTable: clients.map(({ color, ...c }) => c),
     topByConversations,
     scatterData,
     dailyData,
+    customersAtRisk,
   }
 }
 

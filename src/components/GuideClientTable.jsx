@@ -58,6 +58,9 @@ const COLS = [
   { label: 'Conversations',       key: 'conversations',   type: 'num', unit: '' },
   { label: 'Avg Messages / Conv', key: 'avgMessages',     type: 'num', unit: '' },
   { label: 'Users Interacted',    key: 'usersInteracted', type: 'num', unit: '' },
+  { label: 'Total Messages',      key: 'totalMessages',   type: 'num', unit: '' },
+  { label: 'Helpful %',           key: 'helpfulPct',      type: 'num', unit: '' },
+  { label: 'Not Helpful %',       key: 'notHelpfulPct',   type: 'num', unit: '' },
 ]
 
 const NUM_OPTIONS = [
@@ -279,13 +282,20 @@ export default function GuideClientTable({ data }) {
   const avgMsgsAvg  = sorted.length > 0
     ? Math.round(sorted.reduce((s, r) => s + r.avgMessages, 0) / sorted.length * 10) / 10
     : 0
+  const totalMessages = sorted.reduce((s, r) => s + (r.totalMessages || 0), 0)
+  const weightedHelpfulPct = totalMessages > 0
+    ? Math.round(sorted.reduce((s, r) => s + (r.totalMessages || 0) * (r.helpfulPct || 0), 0) / totalMessages * 10) / 10
+    : 0
+  const weightedNotHelpfulPct = totalMessages > 0
+    ? Math.round(sorted.reduce((s, r) => s + (r.totalMessages || 0) * (r.notHelpfulPct || 0), 0) / totalMessages * 10) / 10
+    : 0
 
   const handleExport = () => {
-    const headers = ['Institute', 'Status', 'Live Date', 'Conversations', 'Avg Messages/Conv', 'Users Interacted']
+    const headers = ['Institute', 'Status', 'Live Date', 'Conversations', 'Avg Messages/Conv', 'Users Interacted', 'Total Messages', 'Helpful %', 'Not Helpful %']
     const csv = [
       headers.join(','),
-      ...sorted.map(r => [`"${r.name}"`, r.status, `"${r.liveDate || ''}"`, r.conversations, r.avgMessages, r.usersInteracted].join(',')),
-      ['Total / Average', '—', '—', totalConvs, avgMsgsAvg, totalUsers].join(','),
+      ...sorted.map(r => [`"${r.name}"`, r.status, `"${r.liveDate || ''}"`, r.conversations, r.avgMessages, r.usersInteracted, r.totalMessages || 0, r.helpfulPct || 0, r.notHelpfulPct || 0].join(',')),
+      ['Total / Average', '—', '—', totalConvs, avgMsgsAvg, totalUsers, totalMessages, weightedHelpfulPct, weightedNotHelpfulPct].join(','),
     ].join('\n')
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
@@ -394,10 +404,13 @@ export default function GuideClientTable({ data }) {
                 <td className="py-3 px-2 text-gray-700">{r.conversations.toLocaleString()}</td>
                 <td className="py-3 px-2 text-gray-700">{r.avgMessages}</td>
                 <td className="py-3 px-2 text-gray-700">{r.usersInteracted.toLocaleString()}</td>
+                <td className="py-3 px-2 text-gray-700">{r.totalMessages?.toLocaleString() ?? '—'}</td>
+                <td className="py-3 px-2 text-gray-700">{r.helpfulPct != null ? `${r.helpfulPct}%` : '—'}</td>
+                <td className="py-3 px-2 text-gray-700">{r.notHelpfulPct != null ? `${r.notHelpfulPct}%` : '—'}</td>
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={6} className="py-8 text-center text-gray-400">No results match the current filters.</td></tr>
+              <tr><td colSpan={9} className="py-8 text-center text-gray-400">No results match the current filters.</td></tr>
             )}
             {sorted.length > 0 && (
               <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
@@ -407,6 +420,9 @@ export default function GuideClientTable({ data }) {
                 <td className="py-3 px-2 text-gray-700">{totalConvs.toLocaleString()}</td>
                 <td className="py-3 px-2 text-gray-700">{avgMsgsAvg}</td>
                 <td className="py-3 px-2 text-gray-700">{totalUsers.toLocaleString()}</td>
+                <td className="py-3 px-2 text-gray-700">{totalMessages.toLocaleString()}</td>
+                <td className="py-3 px-2 text-gray-700">{weightedHelpfulPct}%</td>
+                <td className="py-3 px-2 text-gray-700">{weightedNotHelpfulPct}%</td>
               </tr>
             )}
           </tbody>

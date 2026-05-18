@@ -9,6 +9,7 @@ import ClientTable from './components/ClientTable'
 import GlobalFilters from './components/GlobalFilters'
 import GuideKPICards from './components/GuideKPICards'
 import GuideDailyChart from './components/GuideDailyChart'
+import GuideMessagesChart from './components/GuideMessagesChart'
 import GuideClientTable from './components/GuideClientTable'
 import GuideTopInstitutesChart from './components/GuideTopInstitutesChart'
 import OnboardingKPICards from './components/OnboardingKPICards'
@@ -179,7 +180,11 @@ export default function App() {
 
     const kpi = { ...data.kpi, totalCallsDialed, totalConnected, overallConnRate, leadsQualified, avgQualRate, avgCallDuration }
 
-    return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, clientTable, clientColorMap: data.clientColorMap }
+    // ── Step 7: Filter customersAtRisk to match filtered clientTable ──────────
+    const filteredNames = new Set(clientTable.map(c => c.name))
+    const customersAtRisk = (data.customersAtRisk || []).filter(c => filteredNames.has(c.name))
+
+    return { kpi, dailyVolume, topClientsByVolume, scatterData, daywiseData, clientTable, clientColorMap: data.clientColorMap, customersAtRisk }
   }, [data, filters])
 
   // ── Guide filtered data ────────────────────────────────────────────────────
@@ -219,9 +224,22 @@ export default function App() {
     }))
 
     // ── 5. KPIs ────────────────────────────────────────────────────────────
-    let totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser
+    let totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser, helpfulPct, notHelpfulPct, helpfulCount, notHelpfulCount
     // dimmedKpis: keys that can't be recomputed for the active filter (shown with "all-time" tag)
     const dimmedKpis = new Set()
+
+    const calcHelpful = (rows) => {
+      const totalMsgs = rows.reduce((s, c) => s + (c.totalMessages || 0), 0)
+      if (totalMsgs === 0) return { helpfulPct: null, notHelpfulPct: null, helpfulCount: null, notHelpfulCount: null }
+      const rawHelpful    = rows.reduce((s, c) => s + (c.totalMessages || 0) * (c.helpfulPct    || 0), 0)
+      const rawNotHelpful = rows.reduce((s, c) => s + (c.totalMessages || 0) * (c.notHelpfulPct || 0), 0)
+      return {
+        helpfulPct:      Math.round(rawHelpful    / totalMsgs * 10) / 10,
+        notHelpfulPct:   Math.round(rawNotHelpful / totalMsgs * 10) / 10,
+        helpfulCount:    Math.round(rawHelpful    / 100),
+        notHelpfulCount: Math.round(rawNotHelpful / 100),
+      }
+    }
 
     if (hasInstFilter) {
       totalConversations = clientTable.reduce((s, c) => s + c.conversations, 0)
@@ -229,20 +247,29 @@ export default function App() {
       avgMessages        = clientTable.length > 0 ? Math.round(clientTable.reduce((s, c) => s + c.avgMessages,   0) / clientTable.length * 10)  / 10  : 0
       avgConvsPerUser    = clientTable.length > 0 ? Math.round(clientTable.reduce((s, c) => s + c.convsPerUser,  0) / clientTable.length * 100) / 100 : 0
       activeClients      = clientTable.filter(c => c.status.toLowerCase().includes('live')).length
+      ;({ helpfulPct, notHelpfulPct, helpfulCount, notHelpfulCount } = calcHelpful(clientTable))
     } else if (hasDateFilter) {
       totalConversations = dailyData.reduce((s, d) => s + d.conversations, 0)
       totalUsers         = dailyData.reduce((s, d) => s + d.usersInteracted, 0)
       avgConvsPerUser    = totalUsers > 0 ? Math.round(totalConversations / totalUsers * 100) / 100 : 0
-      // These 2 cannot be derived from daily aggregate data — show all-time values with a tag
+      // These cannot be derived from daily aggregate data — show all-time values with a tag
       avgMessages   = g.kpi.avgMessages
       activeClients = g.kpi.activeClients
+      ;({ helpfulPct, notHelpfulPct, helpfulCount, notHelpfulCount } = calcHelpful(g.clientTable))
       dimmedKpis.add('avgMessages'); dimmedKpis.add('activeClients')
+      dimmedKpis.add('helpfulPct'); dimmedKpis.add('notHelpfulPct')
     } else {
       ;({ totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser } = g.kpi)
+      ;({ helpfulPct, notHelpfulPct, helpfulCount, notHelpfulCount } = calcHelpful(g.clientTable))
     }
 
+    // ── Guide at-risk: from server (last conversation date per institute) ──────
+    const customersAtRisk = hasInstFilter
+      ? (g.customersAtRisk || []).filter(c => activeInsts.has(c.name))
+      : (g.customersAtRisk || [])
+
     return {
-      kpi: { totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser },
+      kpi: { totalConversations, totalUsers, avgMessages, activeClients, avgConvsPerUser, helpfulPct, notHelpfulPct, helpfulCount, notHelpfulCount },
       dailyData,
       clientTable,
       topByConversations,
@@ -250,6 +277,7 @@ export default function App() {
       hasInstFilter,
       hasDateFilter,
       dimmedKpis,
+      customersAtRisk,
     }
   }, [data, guideFilters])
 
@@ -337,7 +365,7 @@ export default function App() {
               <DaywiseChart data={d.daywiseData} clientColorMap={d.clientColorMap} />
             </div>
             <div className="mb-4">
-              <CustomersAtRisk data={data?.customersAtRisk} />
+              <CustomersAtRisk data={d.customersAtRisk} />
             </div>
             <div className="mb-6">
               <ClientTable data={d.clientTable} />
@@ -363,6 +391,9 @@ export default function App() {
                 selectedInsts={guideFilters.clients}
               />
               <GuideTopInstitutesChart data={filteredGuide.topByConversations} />
+            </div>
+            <div className="mb-4">
+              <GuideMessagesChart data={filteredGuide.clientTable} />
             </div>
             <div className="mb-6">
               <GuideClientTable data={filteredGuide.clientTable} />
