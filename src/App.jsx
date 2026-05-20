@@ -408,9 +408,22 @@ export default function App() {
         )}
 
         {/* ── Mio Onboarding ── */}
+        {activeTab === 'onboarding' && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
+            <iframe
+              src="https://analytics.zoho.in/open-view/446399000010299625"
+              title="Mio Onboarding Dashboard"
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              allowFullScreen
+            />
+          </div>
+        )}
+
+        {/* ── COMMENTED OUT: Previous Mio Onboarding tracker UI (restore by replacing the iframe block above with this) ──
         {activeTab === 'onboarding' && data?.tracker && (
           <>
-            {/* Sub-tab switcher */}
             <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-4 w-fit">
               <button
                 onClick={() => setOnboardingSubTab('voice')}
@@ -436,26 +449,17 @@ export default function App() {
 
             {onboardingSubTab === 'voice' && (
               <>
-                {/* KPI strip */}
                 <OnboardingKPICards kpi={data.tracker.voice.kpi} type="voice" />
-
-                {/* Charts row: trend + status */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <OnboardingMonthlyTrend data={data.tracker.voice.monthlyTrend} title="Monthly Inflow vs Live" />
                   <OnboardingStatusChart data={data.tracker.voice.byStatus} title="Status Breakdown" />
                 </div>
-
-                {/* Cohort matrix */}
                 <div className="mb-4">
                   <OnboardingAtRisk data={data.tracker.voice.cohortMatrix} />
                 </div>
-
-                {/* Last 5 live */}
                 <div className="mb-4">
                   <OnboardingLastFiveLive data={data.tracker.voice.lastFiveLive} />
                 </div>
-
-                {/* Full client table */}
                 <div className="mb-6">
                   <OnboardingClientTable clients={data.tracker.voice.clients} type="voice" />
                 </div>
@@ -464,26 +468,17 @@ export default function App() {
 
             {onboardingSubTab === 'guide' && (
               <>
-                {/* KPI strip */}
                 <OnboardingKPICards kpi={data.tracker.guide.kpi} type="guide" />
-
-                {/* Charts row: trend + status */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <OnboardingMonthlyTrend data={data.tracker.guide.monthlyTrend} title="Monthly Inflow vs Live" />
                   <OnboardingStatusChart data={data.tracker.guide.byStatus} title="Status Breakdown" />
                 </div>
-
-                {/* Cohort matrix */}
                 <div className="mb-4">
                   <OnboardingAtRisk data={data.tracker.guide.cohortMatrix} />
                 </div>
-
-                {/* Last 5 live */}
                 <div className="mb-4">
                   <OnboardingLastFiveLive data={data.tracker.guide.lastFiveLive} />
                 </div>
-
-                {/* Full client table */}
                 <div className="mb-6">
                   <OnboardingClientTable clients={data.tracker.guide.clients} type="guide" />
                 </div>
@@ -497,6 +492,7 @@ export default function App() {
             No Onboarding data available yet.
           </div>
         )}
+        ── END COMMENTED OUT ── */}
 
 
       </div>
