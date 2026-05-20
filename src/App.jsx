@@ -409,90 +409,18 @@ export default function App() {
 
         {/* ── Mio Onboarding ── */}
         {activeTab === 'onboarding' && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
+          <div className="rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px', position: 'relative' }}>
             <iframe
               src="https://analytics.zoho.in/open-view/446399000010299625"
               title="Mio Onboarding Dashboard"
               width="100%"
-              height="100%"
               frameBorder="0"
               allowFullScreen
+              style={{ position: 'absolute', top: '-52px', left: 0, width: '100%', height: 'calc(100% + 52px)' }}
             />
           </div>
         )}
 
-        {/* ── COMMENTED OUT: Previous Mio Onboarding tracker UI (restore by replacing the iframe block above with this) ──
-        {activeTab === 'onboarding' && data?.tracker && (
-          <>
-            <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-4 w-fit">
-              <button
-                onClick={() => setOnboardingSubTab('voice')}
-                className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-all ${
-                  onboardingSubTab === 'voice'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Voice Tracker
-              </button>
-              <button
-                onClick={() => setOnboardingSubTab('guide')}
-                className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-all ${
-                  onboardingSubTab === 'guide'
-                    ? 'bg-white text-emerald-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Guide Tracker
-              </button>
-            </div>
-
-            {onboardingSubTab === 'voice' && (
-              <>
-                <OnboardingKPICards kpi={data.tracker.voice.kpi} type="voice" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <OnboardingMonthlyTrend data={data.tracker.voice.monthlyTrend} title="Monthly Inflow vs Live" />
-                  <OnboardingStatusChart data={data.tracker.voice.byStatus} title="Status Breakdown" />
-                </div>
-                <div className="mb-4">
-                  <OnboardingAtRisk data={data.tracker.voice.cohortMatrix} />
-                </div>
-                <div className="mb-4">
-                  <OnboardingLastFiveLive data={data.tracker.voice.lastFiveLive} />
-                </div>
-                <div className="mb-6">
-                  <OnboardingClientTable clients={data.tracker.voice.clients} type="voice" />
-                </div>
-              </>
-            )}
-
-            {onboardingSubTab === 'guide' && (
-              <>
-                <OnboardingKPICards kpi={data.tracker.guide.kpi} type="guide" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <OnboardingMonthlyTrend data={data.tracker.guide.monthlyTrend} title="Monthly Inflow vs Live" />
-                  <OnboardingStatusChart data={data.tracker.guide.byStatus} title="Status Breakdown" />
-                </div>
-                <div className="mb-4">
-                  <OnboardingAtRisk data={data.tracker.guide.cohortMatrix} />
-                </div>
-                <div className="mb-4">
-                  <OnboardingLastFiveLive data={data.tracker.guide.lastFiveLive} />
-                </div>
-                <div className="mb-6">
-                  <OnboardingClientTable clients={data.tracker.guide.clients} type="guide" />
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {activeTab === 'onboarding' && !data?.tracker && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400">
-            No Onboarding data available yet.
-          </div>
-        )}
-        ── END COMMENTED OUT ── */}
 
 
       </div>
