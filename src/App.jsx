@@ -342,6 +342,16 @@ export default function App() {
           >
             Mio Onboarding
           </button>
+          <button
+            onClick={() => setActiveTab('qc')}
+            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
+              activeTab === 'qc'
+                ? 'bg-white text-rose-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Mio QC Dashboard
+          </button>
         </div>
 
         {/* ── Mio Voice ── */}
@@ -417,6 +427,21 @@ export default function App() {
               frameBorder="0"
               allowFullScreen
               style={{ position: 'absolute', top: '-52px', left: 0, width: '100%', height: 'calc(100% + 52px)' }}
+            />
+          </div>
+        )}
+
+        {/* ── Mio QC Dashboard ── */}
+        {activeTab === 'qc' && (
+          <div className="rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
+            <iframe
+              src="https://qcdash.vercel.app/"
+              title="Mio QC Dashboard"
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              allowFullScreen
+              style={{ display: 'block', width: '100%', height: '100%' }}
             />
           </div>
         )}
