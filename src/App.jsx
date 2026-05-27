@@ -333,6 +333,16 @@ export default function App() {
             Mio Guide
           </button>
           <button
+            onClick={() => setActiveTab('coach')}
+            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
+              activeTab === 'coach'
+                ? 'bg-white text-teal-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Mio AI Coach
+          </button>
+          <button
             onClick={() => setActiveTab('onboarding')}
             className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
               activeTab === 'onboarding'
@@ -414,6 +424,21 @@ export default function App() {
         {activeTab === 'guide' && !filteredGuide && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400">
             No Guide data available yet.
+          </div>
+        )}
+
+        {/* ── Mio AI Coach ── */}
+        {activeTab === 'coach' && (
+          <div className="rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
+            <iframe
+              src="https://mio-coach-dashboard.vercel.app/"
+              title="Mio AI Coach"
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              allowFullScreen
+              style={{ display: 'block', width: '100%', height: '100%' }}
+            />
           </div>
         )}
 
