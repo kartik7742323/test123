@@ -460,7 +460,7 @@ export default function App() {
         {activeTab === 'qc' && (
           <div className="rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
             <iframe
-              src="https://qcdash.vercel.app/"
+              src="https://qcdash.vercel.app/?embed_key=16a7435a3cb0eb4e9e41dcda748ba5857941022817fcab01f19946a898ce5343"
               title="Mio QC Dashboard"
               width="100%"
               height="100%"
