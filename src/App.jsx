@@ -51,7 +51,7 @@ export default function App() {
   const [error, setError]     = useState(null)
   const [filters, setFilters]           = useState({ dateFrom: '', dateTo: '', clients: [] })
   const [guideFilters, setGuideFilters] = useState({ dateFrom: '', dateTo: '', clients: [] })
-  const [activeTab, setActiveTab]       = useState('voice')
+  const [activeTab, setActiveTab]       = useState('voiceAdoption')
   const [onboardingSubTab, setOnboardingSubTab] = useState('voice')
 
   const fetchData = async (forceRefresh = false) => {
@@ -313,14 +313,14 @@ export default function App() {
         {/* Tab Switcher */}
         <div className="flex gap-1 p-1 bg-gray-200 rounded-xl mb-4 sm:mb-6 w-fit">
           <button
-            onClick={() => setActiveTab('voice')}
+            onClick={() => setActiveTab('voiceAdoption')}
             className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
-              activeTab === 'voice'
-                ? 'bg-white text-blue-600 shadow-sm'
+              activeTab === 'voiceAdoption'
+                ? 'bg-white text-indigo-600 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            Mio Voice
+            Mio Voice Adoption
           </button>
           <button
             onClick={() => setActiveTab('guide')}
@@ -361,6 +361,18 @@ export default function App() {
             }`}
           >
             Mio QC Dashboard
+          </button>
+          <button
+            disabled
+            aria-disabled="true"
+            title="Locked"
+            className="px-5 py-2 text-sm font-semibold rounded-lg transition-all text-gray-400 cursor-not-allowed flex items-center gap-1.5 opacity-70"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Mio Voice
           </button>
         </div>
 
@@ -494,7 +506,20 @@ export default function App() {
           </div>
         )}
 
-
+        {/* ── Mio Voice Adoption ── */}
+        {activeTab === 'voiceAdoption' && (
+          <div className="rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
+            <iframe
+              src="https://app.powerbi.com/view?r=eyJrIjoiNDQxNjFhYzUtZDcxYi00ZmNhLWE1OWYtOGVkMzkyNTA2N2NiIiwidCI6IjUzYmE2ZDY2LTQ5YTctNDUxMC1iYjhiLTQ0NTExZGM2ZmVjYiJ9"
+              title="Mio Voice Adoption"
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              allowFullScreen
+              style={{ display: 'block', width: '100%', height: '100%' }}
+            />
+          </div>
+        )}
 
       </div>
     </div>
