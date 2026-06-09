@@ -458,16 +458,39 @@ export default function App() {
 
         {/* ── Mio QC Dashboard ── */}
         {activeTab === 'qc' && (
-          <div className="rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
-            <iframe
-              src="https://qcdash.vercel.app/?embed_key=16a7435a3cb0eb4e9e41dcda748ba5857941022817fcab01f19946a898ce5343"
-              title="Mio QC Dashboard"
-              width="100%"
-              height="100%"
-              frameBorder="0"
-              allowFullScreen
-              style={{ display: 'block', width: '100%', height: '100%' }}
-            />
+          <div
+            className="rounded-2xl overflow-hidden border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-rose-100 relative"
+            style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}
+          >
+            <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(244,63,94,0.12), transparent 40%), radial-gradient(circle at 80% 80%, rgba(244,63,94,0.10), transparent 40%)' }} />
+            <div className="relative h-full flex flex-col items-center justify-center text-center px-8">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center mb-6 shadow-lg shadow-rose-300/40">
+                <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 3v18h18" />
+                  <rect x="7" y="12" width="3" height="6" rx="0.5" />
+                  <rect x="12" y="8" width="3" height="10" rx="0.5" />
+                  <rect x="17" y="5" width="3" height="13" rx="0.5" />
+                </svg>
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">Mio QC Dashboard</h2>
+              <p className="text-gray-600 text-base max-w-md mb-8 leading-relaxed">
+                View detailed quality control metrics, issue tracking, and call-level analytics in the dedicated QC dashboard.
+              </p>
+              <a
+                href="https://qcdash.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-7 py-3.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-sm font-semibold rounded-xl shadow-md shadow-rose-300/40 hover:shadow-lg hover:shadow-rose-400/50 transition-all hover:-translate-y-0.5"
+              >
+                Open QC Dashboard
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </a>
+              <p className="text-xs text-gray-500 mt-6">Opens in a new tab</p>
+            </div>
           </div>
         )}
 
