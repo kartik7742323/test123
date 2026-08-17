@@ -363,6 +363,16 @@ export default function App() {
             Mio QC Dashboard
           </button>
           <button
+            onClick={() => setActiveTab('retryAdoption')}
+            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${
+              activeTab === 'retryAdoption'
+                ? 'bg-white text-sky-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Mio - Retry Adoption
+          </button>
+          <button
             disabled
             aria-disabled="true"
             title="Locked"
@@ -445,6 +455,21 @@ export default function App() {
             <iframe
               src="https://mio-coach-dashboard.vercel.app/"
               title="Mio AI Coach"
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              allowFullScreen
+              style={{ display: 'block', width: '100%', height: '100%' }}
+            />
+          </div>
+        )}
+
+        {/* ── Mio - Retry Adoption ── */}
+        {activeTab === 'retryAdoption' && (
+          <div className="rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
+            <iframe
+              src="https://mio-voice-retry-dashboard.vercel.app/"
+              title="Mio - Retry Adoption"
               width="100%"
               height="100%"
               frameBorder="0"
