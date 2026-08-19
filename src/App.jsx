@@ -535,7 +535,7 @@ export default function App() {
         {activeTab === 'voiceAdoption' && (
           <div className="rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
             <iframe
-              src="https://app.powerbi.com/view?r=eyJrIjoiNDQxNjFhYzUtZDcxYi00ZmNhLWE1OWYtOGVkMzkyNTA2N2NiIiwidCI6IjUzYmE2ZDY2LTQ5YTctNDUxMC1iYjhiLTQ0NTExZGM2ZmVjYiJ9"
+              src="https://analytics.zoho.in/open-view/446399000019821256/b7421927908c2a7d4d0b2f6ce66457a4bbafe3c8cf96e30869bf80042ed60e4d"
               title="Mio Voice Adoption"
               width="100%"
               height="100%"
