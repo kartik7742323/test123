@@ -535,7 +535,7 @@ export default function App() {
         {activeTab === 'voiceAdoption' && (
           <div className="rounded-xl overflow-hidden" style={{ height: 'calc(100vh - 180px)', minHeight: '600px' }}>
             <iframe
-              src="https://analytics.zoho.in/open-view/446399000019821256/b7421927908c2a7d4d0b2f6ce66457a4bbafe3c8cf96e30869bf80042ed60e4d"
+              src="https://analytics.zoho.in/open-view/446399000020350463/e57d99f76b4b3a07a3dcab48e86890b6466334facd7c13f7ed91c70f06cdf765"
               title="Mio Voice Adoption"
               width="100%"
               height="100%"
