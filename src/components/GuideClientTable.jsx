@@ -4,7 +4,7 @@ import { Search, Download, ChevronUp, ChevronDown, X } from 'lucide-react'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const s = String(status).toLowerCase()
-  const cls = s.includes('live') ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+  const cls = s.startsWith('live') ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
   return <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>{status}</span>
 }
 

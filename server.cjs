@@ -111,13 +111,15 @@ function parseNum(v) {
   return parseFloat(String(v).replace(/,/g, '').replace('%', '')) || 0
 }
 
-// Parse M/D/YYYY or M/D/YY → Date object
+// Parse M/D/YYYY, M/D/YY, or YYYY-MM-DD → Date object
 function parseSheetDate(s) {
   if (!s) return null
   const m4 = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
   if (m4) return new Date(parseInt(m4[3]), parseInt(m4[1]) - 1, parseInt(m4[2]))
   const m2 = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)
   if (m2) return new Date(2000 + parseInt(m2[3]), parseInt(m2[1]) - 1, parseInt(m2[2]))
+  const iso = String(s).match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (iso) return new Date(parseInt(iso[1]), parseInt(iso[2]) - 1, parseInt(iso[3]))
   return null
 }
 
@@ -382,47 +384,58 @@ function buildTrackerData(voiceRows, guideRows) {
 
 // ─── Guide data builder ───────────────────────────────────────────────────────
 async function buildGuideData(allClientsRows, daywiseRows) {
-  // ── All Clients Data ───────────────────────────────────────────────────────
-  // Cols: Institute | Status | Number of Conversations | Avg Messages per Conv | Users Interacted | Live Date (+ possibly others)
-  const headerRow = (allClientsRows[0] || []).map(h => String(h || '').trim().toLowerCase())
-  const liveDateIdx = headerRow.findIndex(h => h.includes('live') && h.includes('date'))
-  const helpfulIdx = headerRow.findIndex(h => h.includes('helpful') && !h.includes('not'))
-  const notHelpfulIdx = headerRow.findIndex(h => h.includes('not') && h.includes('helpful'))
-  const totalMessagesIdx = headerRow.findIndex(h => h.includes('total') && h.includes('messages'))
+  // ── All Clients Data (from "Guide Institute-wise Data": A-H mirrored live from "Automated data" via
+  // sheet formula, I/J = status/live_date via VLOOKUP against "Guide Live Institutes", keyed on institute_id) ──
+  const headerRow        = (allClientsRows[0] || []).map(h => String(h || '').trim().toLowerCase())
+  const nameIdx          = headerRow.findIndex(h => h.includes('name'))
+  const convsIdx         = headerRow.findIndex(h => h.includes('conversation'))
+  const totalMessagesIdx = headerRow.findIndex(h => h.includes('message'))
+  const usersIdx         = headerRow.findIndex(h => h.includes('user'))
+  const helpfulYesIdx    = headerRow.findIndex(h => h.includes('helpful') && h.includes('yes'))
+  const helpfulNoIdx     = headerRow.findIndex(h => h.includes('helpful') && h.includes('no'))
+  const statusIdx        = headerRow.findIndex(h => h.includes('status'))
+  const liveDateIdx      = headerRow.findIndex(h => h.includes('live') && h.includes('date'))
 
   const clientRows = allClientsRows
     .slice(1)
-    .filter(r => r[0] && String(r[0]).trim())
+    .filter(r => r[nameIdx] && String(r[nameIdx]).trim())
 
-  const clients = clientRows.map((r, i) => {
-    const conversations   = parseNum(r[2])
-    const avgMessages     = parseNum(r[3])
-    const usersInteracted = parseNum(r[4])
+  const rawClients = clientRows.map((r, i) => {
+    const conversations   = convsIdx   >= 0 ? parseNum(r[convsIdx])   : 0
+    const totalMessages    = totalMessagesIdx >= 0 ? parseNum(r[totalMessagesIdx]) : 0
+    const usersInteracted  = usersIdx  >= 0 ? parseNum(r[usersIdx])   : 0
+    const helpfulYes       = helpfulYesIdx >= 0 ? parseNum(r[helpfulYesIdx]) : 0
+    const helpfulNo        = helpfulNoIdx  >= 0 ? parseNum(r[helpfulNoIdx])  : 0
+    const avgMessages     = conversations > 0 ? Math.round(totalMessages / conversations * 10) / 10 : 0
     const convsPerUser    = usersInteracted > 0 ? Math.round(conversations / usersInteracted * 100) / 100 : 0
-    const msgsPerUser     = usersInteracted > 0 ? Math.round(avgMessages * conversations / usersInteracted * 10) / 10 : 0
+    const msgsPerUser     = usersInteracted > 0 ? Math.round(totalMessages / usersInteracted * 10) / 10 : 0
     return {
       id: i + 1,
-      name:            String(r[0] || '').trim(),
-      status:          String(r[1] || '').trim(),
+      name:            String(r[nameIdx] || '').trim(),
+      status:          statusIdx   >= 0 ? String(r[statusIdx]   || '').trim() : '',
       liveDate:        liveDateIdx >= 0 ? String(r[liveDateIdx] || '').trim() : '',
       conversations,
       avgMessages,
       usersInteracted,
       convsPerUser,
       msgsPerUser,
-      helpfulPct:      helpfulIdx >= 0 ? parseNum(r[helpfulIdx]) : 0,
-      notHelpfulPct:   notHelpfulIdx >= 0 ? parseNum(r[notHelpfulIdx]) : 0,
-      totalMessages:   totalMessagesIdx >= 0 ? parseNum(r[totalMessagesIdx]) : 0,
+      helpfulPct:      totalMessages > 0 ? Math.round(helpfulYes / totalMessages * 1000) / 10 : 0,
+      notHelpfulPct:   totalMessages > 0 ? Math.round(helpfulNo  / totalMessages * 1000) / 10 : 0,
+      totalMessages,
       color:           COLORS[i % COLORS.length],
     }
   })
+
+  // Only surface institutes confirmed "live" in "Automated data" — everything else (blank status,
+  // not-yet-matched, or explicitly non-live) is hidden from the dashboard until its status is filled in.
+  const clients = rawClients.filter(c => c.status.toLowerCase().startsWith('live'))
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
   const totalConversations = clients.reduce((s, c) => s + c.conversations, 0)
   const totalUsers         = clients.reduce((s, c) => s + c.usersInteracted, 0)
   const avgMessages        = clients.length > 0
     ? Math.round(clients.reduce((s, c) => s + c.avgMessages, 0) / clients.length * 10) / 10 : 0
-  const activeClients      = clients.filter(c => c.status.toLowerCase().includes('live')).length
+  const activeClients      = clients.filter(c => c.status.toLowerCase().startsWith('live')).length
   const avgConvsPerUser    = clients.length > 0
     ? Math.round(clients.reduce((s, c) => s + c.convsPerUser, 0) / clients.length * 100) / 100 : 0
   const avgMsgsPerUser     = clients.length > 0
@@ -447,20 +460,19 @@ async function buildGuideData(allClientsRows, daywiseRows) {
     color:        c.color,
   }))
 
-  // ── Daywise Interactions ───────────────────────────────────────────────────
-  // Find column indices from header row (same approach as Voice Daywise Calls)
+  // ── Daywise Interactions (from "Automated date": activity_date | total_conversations | total_messages |
+  // total_users — pre-aggregated across ALL institutes with no per-institute breakdown, so last-activity-
+  // per-institute (customersAtRisk) still can't be derived here. That was already broken with the old
+  // "Guide - Daywise Interactions" tab too — its header had no institute/client/name column either — so
+  // this isn't a new gap, just not yet fixed pending an institute-level daywise feed.
   const gwHeader   = (daywiseRows[0] || []).map(h => String(h || '').trim().toLowerCase())
-  const gwDateIdx  = gwHeader.findIndex(h => h === 'date') >= 0
-    ? gwHeader.findIndex(h => h === 'date')
-    : gwHeader.findIndex(h => h.includes('date'))
-  const gwInstIdx  = gwHeader.findIndex(h => h.includes('institute') || h.includes('client') || h.includes('name'))
-  const gwConvIdx  = gwHeader.findIndex(h => h.includes('conversation') || (h.includes('conv') && !h.includes('user')))
+  const gwDateIdx  = gwHeader.findIndex(h => h.includes('date'))
+  const gwConvIdx  = gwHeader.findIndex(h => h.includes('conversation'))
   const gwUsersIdx = gwHeader.findIndex(h => h.includes('user'))
 
   // Fall back to positional defaults if header not found
   const dateCol  = gwDateIdx  >= 0 ? gwDateIdx  : 0
-  const instCol  = gwInstIdx  >= 0 ? gwInstIdx  : 1
-  const convCol  = gwConvIdx  >= 0 ? gwConvIdx  : 2
+  const convCol  = gwConvIdx  >= 0 ? gwConvIdx  : 1
   const usersCol = gwUsersIdx >= 0 ? gwUsersIdx : 3
 
   const lastConvByInst = {}
@@ -471,10 +483,6 @@ async function buildGuideData(allClientsRows, daywiseRows) {
     if (!dateStr) return
     const date = parseSheetDate(dateStr)
     if (!date) return
-    const rawInst = String(r[instCol] || '').trim()
-    if (!rawInst || rawInst.toLowerCase().includes('total') || rawInst.toLowerCase().includes('grand')) return
-    const inst = normalizeDaywiseName(rawInst, clients)
-    if (!lastConvByInst[inst] || date > lastConvByInst[inst]) lastConvByInst[inst] = date
     const dk = formatDisplayDate(date)
     if (!dayMap[dk]) dayMap[dk] = { date: dk, conversations: 0, usersInteracted: 0, _ts: date.getTime() }
     dayMap[dk].conversations   += parseNum(r[convCol])
@@ -518,8 +526,8 @@ async function buildDashboardData() {
   let guideAllRows = [], guideDaywiseRows = []
   try {
     ;[guideAllRows, guideDaywiseRows] = await Promise.all([
-      fetchSheet('Guide - All Client Data'),
-      fetchSheet('Guide - Daywise Interactions'),
+      fetchSheet('Guide Institute-wise Data'),
+      fetchSheet('Automated date'),
     ])
   } catch (e) {
     console.warn('Guide sheets not found or error:', e.message)

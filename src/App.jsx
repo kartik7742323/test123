@@ -246,7 +246,7 @@ export default function App() {
       totalUsers         = clientTable.reduce((s, c) => s + c.usersInteracted, 0)
       avgMessages        = clientTable.length > 0 ? Math.round(clientTable.reduce((s, c) => s + c.avgMessages,   0) / clientTable.length * 10)  / 10  : 0
       avgConvsPerUser    = clientTable.length > 0 ? Math.round(clientTable.reduce((s, c) => s + c.convsPerUser,  0) / clientTable.length * 100) / 100 : 0
-      activeClients      = clientTable.filter(c => c.status.toLowerCase().includes('live')).length
+      activeClients      = clientTable.filter(c => c.status.toLowerCase().startsWith('live')).length
       ;({ helpfulPct, notHelpfulPct, helpfulCount, notHelpfulCount } = calcHelpful(clientTable))
     } else if (hasDateFilter) {
       totalConversations = dailyData.reduce((s, d) => s + d.conversations, 0)
